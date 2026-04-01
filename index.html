@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#111827" />
+  <title>Digitales Einsatztagebuch</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>🚑 Einsatztagebuch</h1>
+    <div class="header-actions">
+      <button id="btn-export" class="btn">Export</button>
+      <label class="btn file-label">Import
+        <input id="import-input" type="file" accept="application/json" hidden />
+      </label>
+    </div>
+  </header>
+
+  <main>
+    <nav class="tabs">
+      <button class="tab active" data-tab="dienste">Dienste</button>
+      <button class="tab" data-tab="statistik">Statistik</button>
+      <button class="tab" data-tab="codes">Codes</button>
+    </nav>
+
+    <section id="tab-dienste" class="tab-panel active">
+      <div class="layout">
+        <aside id="service-list-panel" class="panel">
+          <div class="panel-head">
+            <h2>Dienste</h2>
+            <button id="btn-new-service" class="btn primary">+ Dienst</button>
+          </div>
+          <div id="service-list" class="card-list"></div>
+        </aside>
+
+        <section id="service-detail-panel" class="panel detail hidden-mobile">
+          <div class="panel-head">
+            <button id="btn-back" class="btn only-mobile">← Zurück</button>
+            <h2 id="service-title">Dienst auswählen</h2>
+            <button id="btn-new-incident" class="btn primary" disabled>+ Einsatz</button>
+          </div>
+          <div id="service-meta" class="service-meta"></div>
+          <div id="incident-list" class="card-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-statistik" class="tab-panel">
+      <div class="panel">
+        <h2>Statistik</h2>
+        <div id="stats" class="stats-grid"></div>
+      </div>
+    </section>
+
+    <section id="tab-codes" class="tab-panel">
+      <div class="panel">
+        <h2>Code-Verwaltung</h2>
+        <div class="code-grid">
+          <div>
+            <div class="panel-head compact">
+              <h3>Alarmcodes</h3>
+              <button id="btn-add-alarm" class="btn">+ Code</button>
+            </div>
+            <div id="alarm-code-list" class="card-list compact"></div>
+          </div>
+          <div>
+            <div class="panel-head compact">
+              <h3>PZC-Diagnosen</h3>
+              <button id="btn-add-pzc" class="btn">+ PZC</button>
+            </div>
+            <div id="pzc-code-list" class="card-list compact"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="service-dialog">
+    <form method="dialog" id="service-form" class="form">
+      <h3>Dienst</h3>
+      <label>Datum<input name="date" type="date" required /></label>
+      <label>Fahrzeug<input name="vehicle" placeholder="RTW 1" required /></label>
+      <label>Dienststelle<input name="station" placeholder="Wache Mitte" required /></label>
+      <menu>
+        <button value="cancel" class="btn">Abbrechen</button>
+        <button value="default" class="btn primary">Speichern</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="incident-dialog">
+    <form method="dialog" id="incident-form" class="form">
+      <h3>Einsatz</h3>
+      <label>Stichwort
+        <input name="alarmCode" list="alarm-codes" placeholder="z. B. Notfall" required />
+      </label>
+      <datalist id="alarm-codes"></datalist>
+
+      <div class="time-grid" id="time-grid"></div>
+
+      <label class="toggle-row">🚨 Blaulicht
+        <input name="lights" type="checkbox" />
+      </label>
+
+      <label>PZC-Code (4 Stellen)
+        <div class="pzc-inputs">
+          <input name="p1" maxlength="1" inputmode="numeric" />
+          <input name="p2" maxlength="1" inputmode="numeric" />
+          <input name="p3" maxlength="1" inputmode="numeric" />
+          <input name="p4" maxlength="1" inputmode="numeric" />
+        </div>
+      </label>
+      <p id="pzc-preview" class="hint">Diagnose: -</p>
+
+      <label>Notiz<textarea name="note" rows="2" placeholder="Kurznotiz..."></textarea></label>
+      <menu>
+        <button value="cancel" class="btn">Abbrechen</button>
+        <button value="default" class="btn primary">Speichern</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="app.js" defer></script>
+</body>
+</html>
