@@ -15,36 +15,15 @@ const byId = (id) => document.getElementById(id);
 
 function loadState() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-    return normalizeState({ ...defaults, ...parsed });
+    return { ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') };
   } catch {
     return structuredClone(defaults);
   }
 }
 
 function saveState() {
-  state = normalizeState(state);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   render();
-}
-
-function normalizeState(raw) {
-  return {
-    ...raw,
-    services: Array.isArray(raw.services) ? raw.services : [],
-    alarmCodes: dedupeByCode(Array.isArray(raw.alarmCodes) ? raw.alarmCodes : defaults.alarmCodes),
-    pzcCodes: dedupeByCode(Array.isArray(raw.pzcCodes) ? raw.pzcCodes : defaults.pzcCodes)
-  };
-}
-
-function dedupeByCode(entries) {
-  const seen = new Set();
-  return entries.filter((entry) => {
-    const code = entry?.code?.trim();
-    if (!code || seen.has(code)) return false;
-    seen.add(code);
-    return true;
-  });
 }
 
 function uid() { return crypto.randomUUID(); }
@@ -201,7 +180,6 @@ function buildTimeButtons() {
     b.onclick = () => {
       const t = prompt(`${k} (HH:MM)`, b.dataset.time || '');
       if (!t) return;
-      if (!/^\d{2}:\d{2}$/.test(t)) return alert('Bitte Zeit im Format HH:MM eingeben.');
       b.dataset.time = t;
       b.classList.add('active');
       b.querySelector('small').textContent = t;
@@ -259,15 +237,15 @@ byId('incident-form').alarmCode.addEventListener('change', (e) => {
 
 byId('btn-add-alarm').onclick = () => {
   const code = prompt('Alarmcode');
-  if (!code?.trim()) return;
-  state.alarmCodes.push({ code: code.trim(), autoLights: confirm('Automatisch Blaulicht setzen?') });
+  if (!code) return;
+  state.alarmCodes.push({ code, autoLights: confirm('Automatisch Blaulicht setzen?') });
   saveState();
 };
 byId('btn-add-pzc').onclick = () => {
-  const code = prompt('PZC-Code');
+  const code = prompt('PZC-Code (4-stellig)');
   const diagnosis = prompt('Diagnose');
-  if (!code?.trim() || !diagnosis?.trim()) return;
-  state.pzcCodes.push({ code: code.trim(), diagnosis: diagnosis.trim() });
+  if (!code || !diagnosis) return;
+  state.pzcCodes.push({ code, diagnosis });
   saveState();
 };
 
@@ -281,7 +259,7 @@ byId('btn-export').onclick = () => {
 byId('import-input').onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  state = normalizeState({ ...defaults, ...JSON.parse(await file.text()) });
+  state = { ...defaults, ...JSON.parse(await file.text()) };
   saveState();
 };
 
