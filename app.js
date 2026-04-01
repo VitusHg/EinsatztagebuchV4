@@ -3,22 +3,14 @@ const timeFields = ['Alarm', 'Anfahrt', 'Einsatzort', 'Transport', 'Ziel', 'Eins
 
 const defaults = {
   services: [],
-  alarmCodes: [
-    { code: 'Notfall', autoLights: true },
-    { code: 'MANV', autoLights: true },
-    { code: 'Krankentransport', autoLights: false }
-  ],
-  pzcCodes: [
-    { code: '1201', diagnosis: 'Akutes Koronarsyndrom' },
-    { code: '3402', diagnosis: 'Krampfanfall' }
-  ]
+  alarmCodes: window.ALARM_CODES || [],
+  pzcCodes: window.PZC_CODES || []
 };
 
 let state = loadState();
 let selectedServiceId = null;
 let editingIncidentId = null;
 
-const $ = (q) => document.querySelector(q);
 const byId = (id) => document.getElementById(id);
 
 function loadState() {
@@ -42,6 +34,7 @@ function render() {
   renderStats();
   renderCodes();
   renderAlarmDatalist();
+  renderPzcDatalist();
 }
 
 function renderServiceList() {
@@ -94,10 +87,15 @@ function renderServiceDetail() {
   s.incidents.forEach((i) => {
     const dur = calcDuration(i.times || {});
     const pzc = i.pzc ? `${i.pzc} (${pzcDiagnosis(i.pzc)})` : '-';
+    const statusStrip = timeFields.map((field) => {
+      const t = i.times?.[field];
+      return `<span class="status-chip ${t ? 'on' : ''}">${field}${t ? ` ${t}` : ''}</span>`;
+    }).join('');
     const card = document.createElement('article');
     card.className = 'card incident-row';
     card.innerHTML = `<div><h4>${i.alarmCode}</h4><div class="meta">⏱️ ${dur} · PZC: ${pzc}</div></div>
-      <div><span class="pill ${i.lights ? 'blue' : ''}">${i.lights ? '🚨' : '⚪'}</span></div>`;
+      <div><span class="pill ${i.lights ? 'blue' : ''}">${i.lights ? '🚨' : '⚪'}</span></div>
+      <div class="status-strip">${statusStrip}</div>`;
     card.onclick = () => openIncidentDialog(i.id);
     list.append(card);
   });
@@ -112,8 +110,14 @@ function renderStats() {
     <div class="card"><h4>Gesamt Einsätze</h4><div>${incidents.length}</div></div>
     <div class="card"><h4>Dienste</h4><div>${state.services.length}</div></div>
     <div class="card"><h4>Blaulicht-Quote</h4><div>${incidents.length ? Math.round(100 * incidents.filter((i) => i.lights).length / incidents.length) : 0}%</div></div>
+    <div class="card"><h4>Häufigste PZC</h4><div class="meta">${topPzc(incidents)}</div></div>
     <div class="card"><h4>Häufige Stichworte</h4><div class="meta">${top.map(([k, v]) => `${k} (${v})`).join(', ') || '-'}</div></div>
   `;
+}
+
+function topPzc(incidents) {
+  const pzcCount = incidents.filter((i) => i.pzc).reduce((acc, i) => ((acc[i.pzc] = (acc[i.pzc] || 0) + 1), acc), {});
+  return Object.entries(pzcCount).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(', ') || '-';
 }
 
 function renderCodes() {
@@ -135,6 +139,9 @@ function codeCard(text) {
 function renderAlarmDatalist() {
   byId('alarm-codes').innerHTML = state.alarmCodes.map((c) => `<option value="${c.code}">`).join('');
 }
+function renderPzcDatalist() {
+  byId('pzc-codes').innerHTML = state.pzcCodes.map((p) => `<option value="${p.code}">${p.diagnosis}</option>`).join('');
+}
 
 function openServiceDialog() {
   byId('service-form').reset();
@@ -150,7 +157,7 @@ function openIncidentDialog(incidentId = null) {
     const inc = serviceById().incidents.find((i) => i.id === incidentId);
     form.alarmCode.value = inc.alarmCode;
     form.lights.checked = inc.lights;
-    (inc.pzc || '').split('').forEach((n, idx) => form[`p${idx + 1}`].value = n || '');
+    form.pzc.value = inc.pzc || '';
     form.note.value = inc.note || '';
     [...byId('time-grid').querySelectorAll('.time-btn')].forEach((btn) => {
       const val = inc.times?.[btn.dataset.key];
@@ -183,8 +190,8 @@ function buildTimeButtons() {
 
 function updatePzcPreview() {
   const form = byId('incident-form');
-  const code = `${form.p1.value}${form.p2.value}${form.p3.value}${form.p4.value}`;
-  byId('pzc-preview').textContent = `Diagnose: ${code.length === 4 ? pzcDiagnosis(code) : '-'}`;
+  const code = form.pzc.value.trim();
+  byId('pzc-preview').textContent = `Diagnose: ${code ? pzcDiagnosis(code) : '-'}`;
 }
 
 byId('btn-new-service').onclick = openServiceDialog;
@@ -213,7 +220,7 @@ byId('incident-form').onsubmit = (e) => {
     alarmCode,
     lights: auto ?? f.lights.checked,
     times,
-    pzc: `${f.p1.value}${f.p2.value}${f.p3.value}${f.p4.value}`,
+    pzc: f.pzc.value.trim(),
     note: f.note.value.trim()
   };
   if (editingIncidentId) s.incidents = s.incidents.map((i) => i.id === editingIncidentId ? payload : i);
@@ -222,7 +229,7 @@ byId('incident-form').onsubmit = (e) => {
   saveState();
 };
 
-['p1', 'p2', 'p3', 'p4'].forEach((id) => byId('incident-form')[id].addEventListener('input', updatePzcPreview));
+byId('incident-form').pzc.addEventListener('input', updatePzcPreview);
 byId('incident-form').alarmCode.addEventListener('change', (e) => {
   const auto = state.alarmCodes.find((a) => a.code === e.target.value)?.autoLights;
   if (auto !== undefined) byId('incident-form').lights.checked = auto;
