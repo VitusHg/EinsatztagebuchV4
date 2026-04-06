@@ -68,10 +68,14 @@ function renderServiceList() {
   list.innerHTML = '';
   [...state.services].sort((a, b) => (b.startAt || '').localeCompare(a.startAt || '')).forEach((s) => {
     const card = document.createElement('button');
-    card.className = 'card';
+    card.className = 'card service-card';
     const start = s.startAt ? formatDateTime(s.startAt) : '-';
     const end = s.endAt ? formatDateTime(s.endAt) : '-';
-    card.innerHTML = `<h4>${start} → ${end}</h4><div class="meta">📍 ${s.location} · 🚑 ${s.vehicle} · 👥 ${s.colleagues?.length || 0} · ${s.incidents.length} Einsätze</div>`;
+    const weekday = new Date(s.startAt).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
+    card.innerHTML = `<h4>☀️ ${start} <span class="pill">${weekday}</span></h4>
+      <div class="meta">📍 ${s.location}</div>
+      <div class="meta">🚑 ${s.vehicle} · 👥 ${s.colleagues?.length || 0}</div>
+      <div class="meta">📷 ${s.incidents.length} Einsätze · ⏱️ ${serviceHours(s)}</div>`;
     card.onclick = () => selectService(s.id);
     list.append(card);
   });
@@ -79,6 +83,11 @@ function renderServiceList() {
 
 function formatDateTime(value) {
   return new Date(value).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+}
+function serviceHours(service) {
+  if (!service.startAt || !service.endAt) return '-';
+  const diffMin = Math.max(0, Math.round((new Date(service.endAt) - new Date(service.startAt)) / 60000));
+  return `${(diffMin / 60).toFixed(1)}h`;
 }
 
 function selectService(id) {
@@ -138,12 +147,22 @@ function renderCodeLists() {
 
 function mountSuggestions(input, containerId, items, max = 8) {
   const box = byId(containerId);
+  let isOpen = false;
   const renderItems = () => {
     const q = input.value.toLowerCase().trim();
-    box.innerHTML = items.filter((x) => x.toLowerCase().includes(q)).slice(0, max).map((x) => `<button type="button" class="suggest">${x}</button>`).join('');
-    [...box.querySelectorAll('.suggest')].forEach((btn) => btn.onclick = () => { input.value = btn.textContent; renderItems(); });
+    const results = items.filter((x) => x.toLowerCase().includes(q)).slice(0, max);
+    box.innerHTML = results.map((x) => `<button type="button" class="dropdown-item">${x}</button>`).join('');
+    box.classList.toggle('open', isOpen && results.length > 0);
+    [...box.querySelectorAll('.dropdown-item')].forEach((btn) => btn.onclick = () => {
+      input.value = btn.textContent;
+      isOpen = false;
+      renderItems();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
   };
-  input.addEventListener('input', renderItems);
+  input.addEventListener('focus', () => { isOpen = true; renderItems(); });
+  input.addEventListener('input', () => { isOpen = true; renderItems(); });
+  input.addEventListener('blur', () => setTimeout(() => { isOpen = false; renderItems(); }, 120));
   renderItems();
 }
 
@@ -191,6 +210,8 @@ function openIncidentDialog(incidentId = null) {
   form.reset();
   const year = String(new Date().getFullYear());
   byId('incident-year-prefix').textContent = year;
+  const nextSuffix = String(((serviceById()?.incidents || []).length + 1)).padStart(6, '0');
+  form.incidentSuffix.value = nextSuffix;
   buildTimeButtons();
   mountSuggestions(form.alarmCode, 'alarm-suggest', state.alarmCodes.map((a) => a.code), 10);
   incidentLights = false;
@@ -234,14 +255,36 @@ function buildTimeButtons() {
     btn.className = 'status-btn';
     btn.dataset.key = name;
     btn.innerHTML = `<strong>${name}</strong><small>--:--</small>`;
-    btn.onclick = () => {
-      const value = prompt(`${name} (HH:MM)`, btn.dataset.time || '');
-      if (!value) return;
-      if (!/^\d{2}:\d{2}$/.test(value)) return alert('Format HH:MM');
+    const writeTime = (value) => {
       btn.dataset.time = value;
       btn.classList.add('on');
       btn.querySelector('small').textContent = value;
     };
+    let longPressTimer = null;
+    let consumed = false;
+    btn.addEventListener('pointerdown', () => {
+      consumed = false;
+      longPressTimer = setTimeout(() => {
+        const now = new Date().toTimeString().slice(0, 5);
+        writeTime(now);
+        consumed = true;
+      }, 520);
+    });
+    btn.addEventListener('pointerup', () => clearTimeout(longPressTimer));
+    btn.addEventListener('pointerleave', () => clearTimeout(longPressTimer));
+    btn.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      const now = new Date().toTimeString().slice(0, 5);
+      writeTime(now);
+      consumed = true;
+    });
+    btn.addEventListener('click', () => {
+      if (consumed) return;
+      const value = prompt(`${name} (HH:MM)`, btn.dataset.time || '');
+      if (!value) return;
+      if (!/^\d{2}:\d{2}$/.test(value)) return alert('Format HH:MM');
+      writeTime(value);
+    });
     root.append(btn);
   });
 }

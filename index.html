@@ -83,12 +83,16 @@
         </label>
       </div>
       <label>Ort
-        <input name="location" autocomplete="off" placeholder="z. B. Graz" required>
-        <div id="service-location-suggest" class="suggest-list"></div>
+        <div class="dropdown-wrap">
+          <input name="location" autocomplete="off" placeholder="z. B. Graz" required>
+          <div id="service-location-suggest" class="dropdown-list"></div>
+        </div>
       </label>
       <label>Einsatzmittel
-        <input name="vehicle" autocomplete="off" placeholder="z. B. RTW 1" required>
-        <div id="service-vehicle-suggest" class="suggest-list"></div>
+        <div class="dropdown-wrap">
+          <input name="vehicle" autocomplete="off" placeholder="z. B. RTW 1" required>
+          <div id="service-vehicle-suggest" class="dropdown-list"></div>
+        </div>
       </label>
       <div>
         <div class="row-between"><span>Kollegen</span><button id="btn-add-colleague" type="button" class="btn">+ Person</button></div>
@@ -105,39 +109,55 @@
     <form method="dialog" id="incident-form" class="form">
       <h3>Einsatz erfassen</h3>
       <div class="incident-header-row">
+        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten">🚨</button>
         <label>Einsatznr.
-          <div class="incident-no-wrap">
-            <span id="incident-year-prefix"></span>
-            <input name="incidentSuffix" maxlength="6" inputmode="numeric" pattern="\d{6}" placeholder="000001" required>
-          </div>
+          <span class="meta">ausklappen unten</span>
         </label>
         <label>Stichwort
-          <input name="alarmCode" autocomplete="off" placeholder="Code auswählen" required>
-          <div id="alarm-suggest" class="suggest-list"></div>
+          <div class="dropdown-wrap">
+            <input name="alarmCode" autocomplete="off" placeholder="Code auswählen" required>
+            <div id="alarm-suggest" class="dropdown-list"></div>
+          </div>
         </label>
-        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten">🚨</button>
       </div>
+      <details class="expander">
+        <summary>Einsatznummer</summary>
+        <div class="incident-no-wrap">
+          <span id="incident-year-prefix"></span>
+          <input name="incidentSuffix" maxlength="6" inputmode="numeric" pattern="\d{6}" placeholder="000001" required>
+        </div>
+      </details>
 
-      <div id="time-grid" class="status-grid"></div>
-      <label>Notiz
-        <textarea name="note" rows="4" placeholder="Anmerkungen / Kommentare"></textarea>
-      </label>
+      <details class="expander">
+        <summary>Zeiten</summary>
+        <div id="time-grid" class="status-grid"></div>
+      </details>
 
-      <div class="pzc-row">
-        <div>
-          <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
-          <small>Diagnosecode</small>
+      <details class="expander">
+        <summary>Kommentar / Notiz</summary>
+        <label>
+          <textarea name="note" rows="4" placeholder="Anmerkungen / Kommentare"></textarea>
+        </label>
+      </details>
+
+      <details class="expander">
+        <summary>PZC</summary>
+        <div class="pzc-row">
+          <div>
+            <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
+            <small>Diagnosecode</small>
+          </div>
+          <div>
+            <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
+            <small>Alter</small>
+          </div>
+          <div>
+            <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
+            <small>Priorität</small>
+          </div>
         </div>
-        <div>
-          <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
-          <small>Alter</small>
-        </div>
-        <div>
-          <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
-          <small>Priorität</small>
-        </div>
-      </div>
-      <p id="pzc-preview" class="meta">Diagnose: -</p>
+        <p id="pzc-preview" class="meta">Diagnose: -</p>
+      </details>
 
       <menu>
         <button value="cancel" class="btn">Abbrechen</button>
