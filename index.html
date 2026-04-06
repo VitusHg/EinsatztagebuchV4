@@ -3,32 +3,31 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#111827" />
-  <title>Digitales Einsatztagebuch</title>
+  <meta name="theme-color" content="#b90f16" />
+  <title>Einsatztagebuch</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="app-header">
-    <h1>🚑 Einsatztagebuch</h1>
+  <header class="topbar">
+    <div class="brand">🚑 Digitales Einsatztagebuch</div>
+    <div class="clock" id="clock"></div>
     <div class="header-actions">
       <button id="btn-export" class="btn">Export</button>
-      <label class="btn file-label">Import
-        <input id="import-input" type="file" accept="application/json" hidden />
-      </label>
+      <label class="btn">Import<input id="import-input" type="file" accept="application/json" hidden></label>
     </div>
   </header>
 
-  <main>
-    <nav class="tabs">
-      <button class="tab active" data-tab="dienste">Dienste</button>
-      <button class="tab" data-tab="statistik">Statistik</button>
-      <button class="tab" data-tab="codes">Codes</button>
-    </nav>
+  <nav class="tabs">
+    <button class="tab active" data-tab="dienste">Dienste</button>
+    <button class="tab" data-tab="statistik">Statistik</button>
+    <button class="tab" data-tab="codes">Codes</button>
+  </nav>
 
+  <main>
     <section id="tab-dienste" class="tab-panel active">
       <div class="layout">
-        <aside id="service-list-panel" class="panel">
+        <aside class="panel">
           <div class="panel-head">
             <h2>Dienste</h2>
             <button id="btn-new-service" class="btn primary">+ Dienst</button>
@@ -42,7 +41,7 @@
             <h2 id="service-title">Dienst auswählen</h2>
             <button id="btn-new-incident" class="btn primary" disabled>+ Einsatz</button>
           </div>
-          <div id="service-meta" class="service-meta"></div>
+          <div id="service-meta" class="meta"></div>
           <div id="incident-list" class="card-list"></div>
         </section>
       </div>
@@ -58,19 +57,13 @@
     <section id="tab-codes" class="tab-panel">
       <div class="panel">
         <h2>Code-Verwaltung</h2>
-        <div class="code-grid">
+        <div class="two-col">
           <div>
-            <div class="panel-head compact">
-              <h3>Alarmcodes</h3>
-              <button id="btn-add-alarm" class="btn">+ Code</button>
-            </div>
+            <div class="panel-head compact"><h3>Alarmcodes</h3></div>
             <div id="alarm-code-list" class="card-list compact"></div>
           </div>
           <div>
-            <div class="panel-head compact">
-              <h3>PZC-Diagnosen</h3>
-              <button id="btn-add-pzc" class="btn">+ PZC</button>
-            </div>
+            <div class="panel-head compact"><h3>PZC</h3></div>
             <div id="pzc-code-list" class="card-list compact"></div>
           </div>
         </div>
@@ -80,10 +73,27 @@
 
   <dialog id="service-dialog">
     <form method="dialog" id="service-form" class="form">
-      <h3>Dienst</h3>
-      <label>Datum<input name="date" type="date" required /></label>
-      <label>Fahrzeug<input name="vehicle" placeholder="RTW 1" required /></label>
-      <label>Dienststelle<input name="station" placeholder="Wache Mitte" required /></label>
+      <h3>Dienst erfassen</h3>
+      <div class="two-col">
+        <label>Beginn
+          <input name="startAt" type="datetime-local" required>
+        </label>
+        <label>Ende
+          <input name="endAt" type="datetime-local" required>
+        </label>
+      </div>
+      <label>Ort
+        <input name="location" autocomplete="off" placeholder="z. B. Graz" required>
+        <div id="service-location-suggest" class="suggest-list"></div>
+      </label>
+      <label>Einsatzmittel
+        <input name="vehicle" autocomplete="off" placeholder="z. B. RTW 1" required>
+        <div id="service-vehicle-suggest" class="suggest-list"></div>
+      </label>
+      <div>
+        <div class="row-between"><span>Kollegen</span><button id="btn-add-colleague" type="button" class="btn">+ Person</button></div>
+        <div id="colleague-wrap" class="stack"></div>
+      </div>
       <menu>
         <button value="cancel" class="btn">Abbrechen</button>
         <button value="default" class="btn primary">Speichern</button>
@@ -93,25 +103,42 @@
 
   <dialog id="incident-dialog">
     <form method="dialog" id="incident-form" class="form">
-      <h3>Einsatz</h3>
-      <label>Stichwort
-        <input name="alarmCode" list="alarm-codes" placeholder="z. B. Notfall" required />
+      <h3>Einsatz erfassen</h3>
+      <div class="incident-header-row">
+        <label>Einsatznr.
+          <div class="incident-no-wrap">
+            <span id="incident-year-prefix"></span>
+            <input name="incidentSuffix" maxlength="6" inputmode="numeric" pattern="\d{6}" placeholder="000001" required>
+          </div>
+        </label>
+        <label>Stichwort
+          <input name="alarmCode" autocomplete="off" placeholder="Code auswählen" required>
+          <div id="alarm-suggest" class="suggest-list"></div>
+        </label>
+        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten">🚨</button>
+      </div>
+
+      <div id="time-grid" class="status-grid"></div>
+      <label>Notiz
+        <textarea name="note" rows="4" placeholder="Anmerkungen / Kommentare"></textarea>
       </label>
-      <datalist id="alarm-codes"></datalist>
 
-      <div class="time-grid" id="time-grid"></div>
+      <div class="pzc-row">
+        <div>
+          <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
+          <small>Diagnosecode</small>
+        </div>
+        <div>
+          <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
+          <small>Alter</small>
+        </div>
+        <div>
+          <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
+          <small>Priorität</small>
+        </div>
+      </div>
+      <p id="pzc-preview" class="meta">Diagnose: -</p>
 
-      <label class="toggle-row">🚨 Blaulicht
-        <input name="lights" type="checkbox" />
-      </label>
-
-      <label>PZC-Code
-        <input name="pzc" list="pzc-codes" placeholder="z. B. 333" />
-      </label>
-      <datalist id="pzc-codes"></datalist>
-      <p id="pzc-preview" class="hint">Diagnose: -</p>
-
-      <label>Notiz<textarea name="note" rows="2" placeholder="Kurznotiz..."></textarea></label>
       <menu>
         <button value="cancel" class="btn">Abbrechen</button>
         <button value="default" class="btn primary">Speichern</button>
