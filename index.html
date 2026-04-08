@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#b90f16" />
+  <title>Einsatztagebuch</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">☰ Einsatztagebuch</div>
+    <div class="clock" id="clock"></div>
+    <div class="header-actions">
+      <button id="btn-export" class="btn">Export</button>
+      <label class="btn">Import<input id="import-input" type="file" accept="application/json" hidden></label>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <nav class="sidebar">
+      <button class="tab active" data-tab="dienste">📅 Dienste</button>
+      <button class="tab" data-tab="statistik">📊 Statistik</button>
+      <button class="tab" data-tab="settings">⚙️ Einstellungen</button>
+    </nav>
+    <main>
+    <section id="tab-dienste" class="tab-panel active">
+      <div class="layout">
+        <aside class="panel">
+          <div class="panel-head">
+            <h2>Dienste</h2>
+            <div class="header-actions">
+              <button id="btn-new-service" class="btn primary">+ Dienst</button>
+              <button id="btn-new-seg" class="btn">+ SEG</button>
+            </div>
+          </div>
+          <div id="service-list" class="card-list"></div>
+        </aside>
+
+        <section id="service-detail-panel" class="panel detail hidden-mobile">
+          <div class="panel-head">
+            <button id="btn-back" class="btn only-mobile">← Zurück</button>
+            <h2 id="service-title">Dienst auswählen</h2>
+            <div class="header-actions">
+              <button id="btn-edit-service" class="btn" disabled>Bearbeiten</button>
+              <button id="btn-new-incident" class="btn primary" disabled>+ Einsatz</button>
+            </div>
+          </div>
+          <div id="service-meta" class="meta"></div>
+          <div id="incident-list" class="card-list"></div>
+        </section>
+      </div>
+    </section>
+
+    <section id="tab-statistik" class="tab-panel">
+      <div class="panel">
+        <h2>Statistik</h2>
+        <div class="two-col">
+          <label>Von<input id="stats-from" type="date"></label>
+          <label>Bis<input id="stats-to" type="date"></label>
+        </div>
+        <div id="stats" class="stats-grid"></div>
+        <div class="two-col">
+          <div class="card">
+            <h4>🚑 Fahrzeuge</h4>
+            <div id="vehicle-pie" class="pie"></div>
+            <div id="vehicle-legend" class="legend"></div>
+          </div>
+          <div class="card">
+            <h4>📍 Dienststellen</h4>
+            <div id="station-pie" class="pie"></div>
+            <div id="station-legend" class="legend"></div>
+          </div>
+        </div>
+        <div class="card">
+          <h4>📅 Einsatzkalender</h4>
+          <div id="calendar-heatmap" class="heatmap"></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-settings" class="tab-panel">
+      <div class="panel">
+        <h2>Einstellungen</h2>
+        <div class="two-col">
+          <label>Zeitzone
+            <select id="settings-timezone">
+              <option value="Europe/Vienna">Europe/Vienna</option>
+              <option value="Europe/Berlin">Europe/Berlin</option>
+              <option value="UTC">UTC</option>
+            </select>
+          </label>
+          <label>Sommer-/Winterzeit
+            <select id="settings-dst">
+              <option value="auto">Automatisch</option>
+              <option value="on">Immer Sommerzeit</option>
+              <option value="off">Keine Sommerzeit</option>
+            </select>
+          </label>
+        </div>
+        <div class="header-actions">
+          <button id="settings-export" class="btn">Export</button>
+          <label class="btn">Import<input id="settings-import" type="file" accept="application/json" hidden></label>
+        </div>
+        <h3>Codes</h3>
+        <div class="two-col">
+          <div>
+            <div class="panel-head compact"><h3>Alarmcodes</h3></div>
+            <div id="alarm-code-list" class="card-list compact"></div>
+          </div>
+          <div>
+            <div class="panel-head compact"><h3>PZC</h3></div>
+            <div id="pzc-code-list" class="card-list compact"></div>
+          </div>
+        </div>
+        <p class="meta credit"><a target="_blank" href="https://icons8.com/icon/8773/siren">Emergency</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a></p>
+      </div>
+    </section>
+    </main>
+  </div>
+
+  <dialog id="service-dialog">
+    <form method="dialog" id="service-form" class="form">
+      <h3>Dienst erfassen</h3>
+      <div class="two-col">
+        <label>Beginn
+          <input name="startAt" type="datetime-local" required>
+        </label>
+        <label>Ende
+          <input name="endAt" type="datetime-local" required>
+        </label>
+      </div>
+      <label>Ort
+        <div class="dropdown-wrap">
+          <input name="location" autocomplete="off" placeholder="z. B. Graz" required>
+          <div id="service-location-suggest" class="dropdown-list"></div>
+        </div>
+      </label>
+      <label>Einsatzmittel
+        <div class="dropdown-wrap">
+          <input name="vehicle" autocomplete="off" placeholder="z. B. RTW 1" required>
+          <div id="service-vehicle-suggest" class="dropdown-list"></div>
+        </div>
+      </label>
+      <div>
+        <div class="row-between"><span>Kollegen</span><button id="btn-add-colleague" type="button" class="btn">+ Person</button></div>
+        <div id="colleague-wrap" class="stack"></div>
+      </div>
+      <menu>
+        <button value="cancel" class="btn" formnovalidate>Abbrechen</button>
+        <button value="default" class="btn primary">Speichern</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="incident-dialog">
+    <form method="dialog" id="incident-form" class="form">
+      <h3>Einsatz erfassen</h3>
+      <div class="incident-header-row">
+        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten"><img class="light-icon" src="lights_on.svg" alt="Blaulicht"><small>Blaulicht</small></button>
+        <label>Einsatznr.
+          <span class="meta">ausklappen unten</span>
+        </label>
+        <label>Stichwort
+          <div class="dropdown-wrap">
+            <input name="alarmCode" autocomplete="off" placeholder="Code auswählen" required>
+            <div id="alarm-suggest" class="dropdown-list"></div>
+          </div>
+        </label>
+      </div>
+      <details class="expander">
+        <summary>Einsatznummer</summary>
+        <div class="incident-no-wrap">
+          <span id="incident-year-prefix"></span>
+          <input name="incidentSuffix" maxlength="6" inputmode="numeric" pattern="\d{6}" placeholder="000001">
+        </div>
+      </details>
+
+      <details class="expander">
+        <summary>Zeiten</summary>
+        <div id="time-grid" class="status-grid"></div>
+      </details>
+
+      <details class="expander">
+        <summary>Kommentar / Notiz</summary>
+        <label>
+          <textarea name="note" rows="4" placeholder="Anmerkungen / Kommentare"></textarea>
+        </label>
+      </details>
+
+      <details class="expander">
+        <summary>PZC</summary>
+        <div class="pzc-row">
+          <div>
+            <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
+            <small>Diagnosecode</small>
+          </div>
+          <div>
+            <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
+            <small>Alter</small>
+          </div>
+          <div>
+            <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
+            <small>Priorität</small>
+          </div>
+        </div>
+        <p id="pzc-preview" class="meta">Diagnose: -</p>
+      </details>
+
+      <menu>
+        <button value="cancel" class="btn" formnovalidate>Abbrechen</button>
+        <button value="default" class="btn primary">Speichern</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <dialog id="seg-dialog">
+    <form method="dialog" id="seg-form" class="form">
+      <h3>SEG Alarmierung</h3>
+      <div class="two-col">
+        <label>Datum<input name="date" type="date" required></label>
+        <label>Dienststelle
+          <div class="dropdown-wrap"><input name="location" required><div id="seg-location-suggest" class="dropdown-list"></div></div>
+        </label>
+      </div>
+      <div class="two-col">
+        <label>Fahrzeug
+          <div class="dropdown-wrap"><input name="vehicle" required><div id="seg-vehicle-suggest" class="dropdown-list"></div></div>
+        </label>
+        <div>
+          <div class="row-between"><span>Kollegen</span><button id="btn-add-seg-colleague" type="button" class="btn">+ Person</button></div>
+          <div id="seg-colleague-wrap" class="stack"></div>
+        </div>
+      </div>
+      <label>Stichwort
+        <div class="dropdown-wrap"><input name="alarmCode" required><div id="seg-alarm-suggest" class="dropdown-list"></div></div>
+      </label>
+      <div id="seg-time-grid" class="status-grid"></div>
+      <label>Notiz<textarea name="note" rows="3"></textarea></label>
+      <menu>
+        <button value="cancel" class="btn" formnovalidate>Abbrechen</button>
+        <button value="default" class="btn primary">Speichern</button>
+      </menu>
+    </form>
+  </dialog>
+
+  <script src="data.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
