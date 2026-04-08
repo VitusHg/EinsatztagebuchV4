@@ -22,7 +22,7 @@
     <nav class="sidebar">
       <button class="tab active" data-tab="dienste">📅 Dienste</button>
       <button class="tab" data-tab="statistik">📊 Statistik</button>
-      <button class="tab" data-tab="codes">🧬 Codes</button>
+      <button class="tab" data-tab="settings">⚙️ Einstellungen</button>
     </nav>
     <main>
     <section id="tab-dienste" class="tab-panel active">
@@ -42,7 +42,10 @@
           <div class="panel-head">
             <button id="btn-back" class="btn only-mobile">← Zurück</button>
             <h2 id="service-title">Dienst auswählen</h2>
-            <button id="btn-new-incident" class="btn primary" disabled>+ Einsatz</button>
+            <div class="header-actions">
+              <button id="btn-edit-service" class="btn" disabled>Bearbeiten</button>
+              <button id="btn-new-incident" class="btn primary" disabled>+ Einsatz</button>
+            </div>
           </div>
           <div id="service-meta" class="meta"></div>
           <div id="incident-list" class="card-list"></div>
@@ -77,9 +80,30 @@
       </div>
     </section>
 
-    <section id="tab-codes" class="tab-panel">
+    <section id="tab-settings" class="tab-panel">
       <div class="panel">
-        <h2>Code-Verwaltung</h2>
+        <h2>Einstellungen</h2>
+        <div class="two-col">
+          <label>Zeitzone
+            <select id="settings-timezone">
+              <option value="Europe/Vienna">Europe/Vienna</option>
+              <option value="Europe/Berlin">Europe/Berlin</option>
+              <option value="UTC">UTC</option>
+            </select>
+          </label>
+          <label>Sommer-/Winterzeit
+            <select id="settings-dst">
+              <option value="auto">Automatisch</option>
+              <option value="on">Immer Sommerzeit</option>
+              <option value="off">Keine Sommerzeit</option>
+            </select>
+          </label>
+        </div>
+        <div class="header-actions">
+          <button id="settings-export" class="btn">Export</button>
+          <label class="btn">Import<input id="settings-import" type="file" accept="application/json" hidden></label>
+        </div>
+        <h3>Codes</h3>
         <div class="two-col">
           <div>
             <div class="panel-head compact"><h3>Alarmcodes</h3></div>
@@ -90,6 +114,7 @@
             <div id="pzc-code-list" class="card-list compact"></div>
           </div>
         </div>
+        <p class="meta credit"><a target="_blank" href="https://icons8.com/icon/8773/siren">Emergency</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a></p>
       </div>
     </section>
     </main>
@@ -133,7 +158,7 @@
     <form method="dialog" id="incident-form" class="form">
       <h3>Einsatz erfassen</h3>
       <div class="incident-header-row">
-        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten"><span>🚨</span><small>Blaulicht</small></button>
+        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten"><img class="light-icon" src="lights_on.svg" alt="Blaulicht"><small>Blaulicht</small></button>
         <label>Einsatznr.
           <span class="meta">ausklappen unten</span>
         </label>
@@ -195,13 +220,22 @@
       <h3>SEG Alarmierung</h3>
       <div class="two-col">
         <label>Datum<input name="date" type="date" required></label>
-        <label>Dienststelle<input name="location" required></label>
+        <label>Dienststelle
+          <div class="dropdown-wrap"><input name="location" required><div id="seg-location-suggest" class="dropdown-list"></div></div>
+        </label>
       </div>
       <div class="two-col">
-        <label>Fahrzeug<input name="vehicle" required></label>
-        <label>Kollege<input name="colleague"></label>
+        <label>Fahrzeug
+          <div class="dropdown-wrap"><input name="vehicle" required><div id="seg-vehicle-suggest" class="dropdown-list"></div></div>
+        </label>
+        <div>
+          <div class="row-between"><span>Kollegen</span><button id="btn-add-seg-colleague" type="button" class="btn">+ Person</button></div>
+          <div id="seg-colleague-wrap" class="stack"></div>
+        </div>
       </div>
-      <label>Stichwort<input name="alarmCode" required></label>
+      <label>Stichwort
+        <div class="dropdown-wrap"><input name="alarmCode" required><div id="seg-alarm-suggest" class="dropdown-list"></div></div>
+      </label>
       <div id="seg-time-grid" class="status-grid"></div>
       <label>Notiz<textarea name="note" rows="3"></textarea></label>
       <menu>

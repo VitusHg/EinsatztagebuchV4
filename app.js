@@ -12,6 +12,7 @@ const defaults = {
 let state = loadState();
 let selectedServiceId = null;
 let editingIncidentId = null;
+let editingServiceId = null;
 let incidentLights = false;
 
 const byId = (id) => document.getElementById(id);
@@ -79,6 +80,7 @@ function renderServiceList() {
       <div class="meta">🚑 ${s.vehicle} · 👥 ${s.colleagues?.length || 0}</div>
       <div class="meta">📷 ${s.incidents.length} Einsätze · ⏱️ ${serviceHours(s)}</div>`;
     card.onclick = () => selectService(s.id);
+    card.ondblclick = () => openServiceDialog(s.id);
     list.append(card);
   });
 }
@@ -125,6 +127,7 @@ function calcDuration(times) {
 function renderServiceDetail() {
   const s = serviceById();
   byId('btn-new-incident').disabled = !s;
+  if (byId('btn-edit-service')) byId('btn-edit-service').disabled = !s;
   byId('service-title').textContent = s ? `${s.vehicle} · ${s.location}` : 'Dienst auswählen';
   byId('service-meta').textContent = s ? `${formatDateTime(s.startAt)} bis ${formatDateTime(s.endAt)} · Kollegen: ${(s.colleagues || []).join(', ') || '-'}` : '';
   const list = byId('incident-list');
@@ -260,8 +263,8 @@ function collectHistoryValues(key) {
   return [...set].sort();
 }
 
-function addColleagueField(value = '') {
-  const wrap = byId('colleague-wrap');
+function addColleagueField(value = '', targetId = 'colleague-wrap') {
+  const wrap = byId(targetId);
   const row = document.createElement('div');
   row.className = 'incident-no-wrap';
   row.innerHTML = `<input class="colleague-input" value="${value}" placeholder="Kollege/Kollegin"><button type="button" class="btn">−</button><div class="suggest-list"></div>`;
@@ -279,11 +282,19 @@ function addColleagueField(value = '') {
   wrap.append(row);
 }
 
-function openServiceDialog() {
+function openServiceDialog(serviceId = null) {
+  editingServiceId = serviceId;
   const form = byId('service-form');
   form.reset();
   byId('colleague-wrap').innerHTML = '';
-  addColleagueField('');
+  const edit = serviceId ? state.services.find((s) => s.id === serviceId) : null;
+  if (edit) {
+    form.startAt.value = edit.startAt || '';
+    form.endAt.value = edit.endAt || '';
+    form.location.value = edit.location || '';
+    form.vehicle.value = edit.vehicle || '';
+  }
+  (edit?.colleagues?.length ? edit.colleagues : ['']).forEach((c) => addColleagueField(c));
   mountSuggestions(form.location, 'service-location-suggest', collectHistoryValues('location'));
   mountSuggestions(form.vehicle, 'service-vehicle-suggest', collectHistoryValues('vehicle'));
   byId('service-dialog').showModal();
@@ -324,7 +335,9 @@ function openIncidentDialog(incidentId = null) {
 function setLightButton() {
   const b = byId('btn-lights-toggle');
   b.classList.toggle('off', !incidentLights);
-  b.innerHTML = incidentLights ? '<span>🚨</span><small>Blaulicht</small>' : '<span>🧰</span><small>Kein Einsatz</small>';
+  b.innerHTML = incidentLights
+    ? '<img class=\"light-icon\" src=\"lights_on.svg\" alt=\"Blaulicht an\"><small>Blaulicht</small>'
+    : '<img class=\"light-icon\" src=\"lights_off.svg\" alt=\"Blaulicht aus\"><small>Kein Einsatz</small>';
 }
 
 function shouldAutoLights(code) {
@@ -382,34 +395,48 @@ function updatePzcPreview() {
 }
 
 byId('btn-new-service').onclick = openServiceDialog;
+if (byId('btn-edit-service')) byId('btn-edit-service').onclick = () => selectedServiceId && openServiceDialog(selectedServiceId);
 byId('btn-new-seg').onclick = () => {
   const f = byId('seg-form');
   f.reset();
+  byId('seg-colleague-wrap').innerHTML = '';
+  addColleagueField('', 'seg-colleague-wrap');
   buildTimeButtons('seg-time-grid');
+  mountSuggestions(f.location, 'seg-location-suggest', collectHistoryValues('location'));
+  mountSuggestions(f.vehicle, 'seg-vehicle-suggest', collectHistoryValues('vehicle'));
+  mountSuggestions(f.alarmCode, 'seg-alarm-suggest', state.alarmCodes.map((a) => a.code), 10);
   byId('seg-dialog').showModal();
 };
 byId('btn-back').onclick = () => byId('service-detail-panel').classList.remove('show-mobile');
 byId('btn-new-incident').onclick = () => openIncidentDialog();
 byId('btn-add-colleague').onclick = () => addColleagueField('');
+if (byId('btn-add-seg-colleague')) byId('btn-add-seg-colleague').onclick = () => addColleagueField('', 'seg-colleague-wrap');
 byId('btn-lights-toggle').onclick = () => { incidentLights = !incidentLights; setLightButton(); };
 if (byId('stats-from')) byId('stats-from').onchange = renderStats;
 if (byId('stats-to')) byId('stats-to').onchange = renderStats;
+if (byId('settings-export')) byId('settings-export').onclick = () => byId('btn-export').click();
+if (byId('settings-import')) byId('settings-import').onchange = (e) => {
+  byId('import-input').files = e.target.files;
+  byId('import-input').dispatchEvent(new Event('change'));
+};
 
 byId('service-form').onsubmit = (e) => {
   e.preventDefault();
   const f = e.target;
   const colleagues = [...byId('colleague-wrap').querySelectorAll('.colleague-input')].map((x) => x.value.trim()).filter(Boolean);
   const service = {
-    id: uid(),
+    id: editingServiceId || uid(),
     startAt: f.startAt.value,
     endAt: f.endAt.value,
     location: f.location.value.trim(),
     vehicle: f.vehicle.value.trim(),
     colleagues,
-    incidents: []
+    incidents: editingServiceId ? (state.services.find((s) => s.id === editingServiceId)?.incidents || []) : []
   };
-  state.services.push(service);
+  if (editingServiceId) state.services = state.services.map((s) => s.id === editingServiceId ? { ...s, ...service } : s);
+  else state.services.push(service);
   selectedServiceId = service.id;
+  editingServiceId = null;
   byId('service-dialog').close();
   saveState();
 };
@@ -443,6 +470,7 @@ byId('incident-form').onsubmit = (e) => {
 byId('seg-form').onsubmit = (e) => {
   e.preventDefault();
   const f = e.target;
+  const segColleagues = [...byId('seg-colleague-wrap').querySelectorAll('.colleague-input')].map((x) => x.value.trim()).filter(Boolean);
   const times = Object.fromEntries([...byId('seg-time-grid').querySelectorAll('.status-btn')].filter((b) => b.dataset.time).map((b) => [b.dataset.key, b.dataset.time]));
   const seg = {
     id: uid(),
@@ -451,7 +479,7 @@ byId('seg-form').onsubmit = (e) => {
     endAt: `${f.date.value}T23:59`,
     location: f.location.value.trim(),
     vehicle: f.vehicle.value.trim(),
-    colleagues: f.colleague.value.trim() ? [f.colleague.value.trim()] : [],
+    colleagues: segColleagues,
     incidents: [{
       id: uid(),
       incidentNumber: `${new Date().getFullYear()}${String(Date.now()).slice(-6)}`,

@@ -48,6 +48,7 @@ menu { display: flex; justify-content: flex-end; gap: .5rem; margin: 0; padding:
 #incident-year-prefix { background: #22365b; border-radius: .55rem; padding: .55rem .5rem; min-width: 52px; text-align: center; font-weight: 700; }
 .light-toggle { height: 86px; border: none; border-radius: .9rem; background: #0f46b5; color: white; display: grid; place-items: center; font-size: 1.2rem; gap: .2rem; padding: .3rem; }
 .light-toggle small { font-size: .7rem; line-height: 1.05; }
+.light-icon { width: 26px; height: 26px; object-fit: contain; }
 .light-toggle.off { background: #6b7280; }
 .status-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: .45rem; }
 .status-btn { border: 1px solid #2f4877; border-radius: .85rem; min-height: 78px; background: #1a2b47; color: white; display: grid; gap: .2rem; padding: .4rem; }
@@ -75,6 +76,7 @@ menu { display: flex; justify-content: flex-end; gap: .5rem; margin: 0; padding:
 .expander { border: 1px solid #31456e; border-radius: .7rem; padding: .45rem .55rem; background: #162845; }
 .expander summary { cursor: pointer; font-weight: 600; }
 .expander[open] { background: #1d2c49; }
+.credit a { color: #93c5fd; }
 dialog { border: none; background: transparent; padding: 0; }
 dialog::backdrop { background: rgba(3, 7, 18, 0.72); backdrop-filter: blur(2px); }
 @media (max-width: 980px) {
