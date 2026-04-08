@@ -136,10 +136,20 @@ function renderStats() {
   const byPzc = incidents.filter((i) => i.pzc?.diag).reduce((a, i) => ((a[i.pzc.diag] = (a[i.pzc.diag] || 0) + 1), a), {});
   const topAlarm = Object.entries(byAlarm).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(', ') || '-';
   const topPzc = Object.entries(byPzc).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(', ') || '-';
-  root.innerHTML = `<div class="card"><h4>Einsätze gesamt</h4>${incidents.length}</div>
-    <div class="card"><h4>Blaulichtquote</h4>${incidents.length ? Math.round(100 * incidents.filter((i) => i.lights).length / incidents.length) : 0}%</div>
-    <div class="card"><h4>Top Stichwörter</h4><div class="meta">${topAlarm}</div></div>
-    <div class="card"><h4>Top PZC Diagnose</h4><div class="meta">${topPzc}</div></div>`;
+  const avgByShift = state.services.length ? (incidents.length / state.services.length).toFixed(1) : '0.0';
+  const durationHours = state.services.reduce((acc, s) => acc + (Number(serviceHours(s).replace('h', '')) || 0), 0).toFixed(1);
+  const blueCount = incidents.filter((i) => i.lights).length;
+  const transportCount = incidents.filter((i) => i.times?.['Transport']).length;
+  const documentationRate = incidents.length ? Math.round((incidents.filter((i) => i.note).length / incidents.length) * 100) : 0;
+  root.innerHTML = `<div class="card"><h4>📟 Einsätze gesamt</h4><strong>${incidents.length}</strong></div>
+    <div class="card"><h4>🗂️ Dienste gesamt</h4><strong>${state.services.length}</strong></div>
+    <div class="card"><h4>⏱️ Dienststunden</h4><strong>${durationHours}h</strong></div>
+    <div class="card"><h4>📈 Ø Einsätze / Dienst</h4><strong>${avgByShift}</strong></div>
+    <div class="card"><h4>🚨 Blaulichtquote</h4><strong>${incidents.length ? Math.round(100 * blueCount / incidents.length) : 0}%</strong><div class="meta">${blueCount}/${incidents.length}</div></div>
+    <div class="card"><h4>🚑 mit Transport</h4><strong>${transportCount}</strong></div>
+    <div class="card"><h4>📝 Dokumentationsquote</h4><strong>${documentationRate}%</strong></div>
+    <div class="card"><h4>🏷️ Top Stichwörter</h4><div class="meta">${topAlarm}</div></div>
+    <div class="card"><h4>🧬 Top PZC Diagnose</h4><div class="meta">${topPzc}</div></div>`;
 }
 
 function renderCodeLists() {
@@ -447,5 +457,16 @@ document.querySelectorAll('.tab').forEach((t) => {
 });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+
+setupDialogDismiss(byId('service-dialog'));
+setupDialogDismiss(byId('incident-dialog'));
+
+function setupDialogDismiss(dialog) {
+  dialog.addEventListener('click', (e) => {
+    const box = dialog.querySelector('.form').getBoundingClientRect();
+    const inside = e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom;
+    if (!inside) dialog.close();
+  });
+}
 
 render();
