@@ -3,6 +3,7 @@ const timeFields = ['Alarmierung', 'Anfahrt', 'Am Einsatzort', 'Transport', 'Am 
 const AUTO_LIGHTS_RE = /^(A\d|B1\b|B2\b|C1\b)/;
 
 const defaults = {
+  profile: { displayName: 'Privat' },
   services: [],
   alarmCodes: window.ALARM_CODES || [],
   pzcCodes: window.PZC_CODES || []
@@ -32,6 +33,7 @@ function loadState() {
 function normalizeState(raw) {
   return {
     ...raw,
+    profile: raw.profile && typeof raw.profile === 'object' ? raw.profile : defaults.profile,
     services: Array.isArray(raw.services) ? raw.services : [],
     alarmCodes: uniqByCode(Array.isArray(raw.alarmCodes) ? raw.alarmCodes : defaults.alarmCodes),
     pzcCodes: uniqByCode(Array.isArray(raw.pzcCodes) ? raw.pzcCodes : defaults.pzcCodes)
@@ -325,8 +327,9 @@ byId('incident-form').onsubmit = (e) => {
   e.preventDefault();
   const f = e.target;
   const alarmCode = f.alarmCode.value.trim();
-  const suffix = f.incidentSuffix.value.trim();
-  if (!/^\d{6}$/.test(suffix)) return alert('Bitte 6 Ziffern bei der Einsatznummer eingeben.');
+  if (!alarmCode) return alert('Bitte mindestens ein Stichwort eingeben.');
+  const rawSuffix = f.incidentSuffix.value.trim();
+  const suffix = /^\d{6}$/.test(rawSuffix) ? rawSuffix : String(Date.now()).slice(-6);
   const year = String(new Date().getFullYear());
   const times = Object.fromEntries([...byId('time-grid').querySelectorAll('.status-btn')].filter((b) => b.dataset.time).map((b) => [b.dataset.key, b.dataset.time]));
   const payload = {
@@ -336,6 +339,7 @@ byId('incident-form').onsubmit = (e) => {
     lights: shouldAutoLights(alarmCode) ? true : incidentLights,
     times,
     note: f.note.value.trim(),
+    createdAt: new Date().toISOString(),
     pzc: { diag: f.pzcDiag.value.trim(), age: f.pzcAge.value.trim(), prio: f.pzcPrio.value.trim() }
   };
   const s = serviceById();
@@ -354,7 +358,8 @@ byId('incident-form').alarmCode.addEventListener('input', (e) => {
 ['pzcDiag', 'pzcAge', 'pzcPrio'].forEach((k) => byId('incident-form')[k].addEventListener('input', updatePzcPreview));
 
 byId('btn-export').onclick = () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const exportPayload = toCompatExport(state);
+  const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `einsatztagebuch-${new Date().toISOString().slice(0, 10)}.json`;
@@ -364,9 +369,73 @@ byId('btn-export').onclick = () => {
 byId('import-input').onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-  state = normalizeState({ ...defaults, ...JSON.parse(await file.text()) });
+  const imported = JSON.parse(await file.text());
+  state = normalizeState(fromCompatibleImport(imported));
   saveState();
 };
+
+function toCompatExport(source) {
+  return {
+    exportedAt: new Date().toISOString(),
+    user: { displayName: source.profile?.displayName || 'Privat' },
+    shifts: source.services.map((s) => {
+      const start = s.startAt ? new Date(s.startAt) : null;
+      const end = s.endAt ? new Date(s.endAt) : null;
+      const duration = start && end ? Number(((end - start) / 3600000).toFixed(2)) : 0;
+      return {
+        shiftId: s.id,
+        startTime: start ? start.toISOString() : null,
+        endTime: end ? end.toISOString() : null,
+        duration,
+        location: s.location || '',
+        resource: s.vehicle || '',
+        tip: 0,
+        note: s.note || '',
+        crew: s.colleagues || [],
+        missions: (s.incidents || []).map((m) => ({
+          missionId: m.id,
+          title: m.alarmCode || '',
+          emergency: !!m.lights,
+          tip: 0,
+          note: m.note || '',
+          creation: m.createdAt || new Date().toISOString(),
+          highlighted: false,
+          incidentNumber: m.incidentNumber || '',
+          times: m.times || {},
+          pzc: m.pzc || {}
+        }))
+      };
+    })
+  };
+}
+
+function fromCompatibleImport(payload) {
+  if (Array.isArray(payload?.services)) return { ...defaults, ...payload };
+  if (!Array.isArray(payload?.shifts)) return { ...defaults };
+  return {
+    ...defaults,
+    profile: { displayName: payload?.user?.displayName || 'Privat' },
+    services: payload.shifts.map((shift) => ({
+      id: shift.shiftId || uid(),
+      startAt: shift.startTime ? new Date(shift.startTime).toISOString().slice(0, 16) : '',
+      endAt: shift.endTime ? new Date(shift.endTime).toISOString().slice(0, 16) : '',
+      location: shift.location || '',
+      vehicle: shift.resource || '',
+      note: shift.note || '',
+      colleagues: Array.isArray(shift.crew) ? shift.crew : [],
+      incidents: (shift.missions || []).map((m) => ({
+        id: m.missionId || uid(),
+        incidentNumber: m.incidentNumber || `${new Date().getFullYear()}${String(Math.floor(Math.random() * 1e6)).padStart(6, '0')}`,
+        alarmCode: m.title || '',
+        lights: !!m.emergency,
+        times: m.times || {},
+        note: m.note || '',
+        createdAt: m.creation || new Date().toISOString(),
+        pzc: m.pzc || { diag: '', age: '', prio: '' }
+      }))
+    }))
+  };
+}
 
 document.querySelectorAll('.tab').forEach((t) => {
   t.onclick = () => {
