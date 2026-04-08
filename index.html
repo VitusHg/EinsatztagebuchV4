@@ -10,7 +10,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand">🚑 Digitales Einsatztagebuch</div>
+    <div class="brand">☰ Einsatztagebuch</div>
     <div class="clock" id="clock"></div>
     <div class="header-actions">
       <button id="btn-export" class="btn">Export</button>
@@ -18,13 +18,13 @@
     </div>
   </header>
 
-  <nav class="tabs">
-    <button class="tab active" data-tab="dienste">Dienste</button>
-    <button class="tab" data-tab="statistik">Statistik</button>
-    <button class="tab" data-tab="codes">Codes</button>
-  </nav>
-
-  <main>
+  <div class="app-shell">
+    <nav class="sidebar">
+      <button class="tab active" data-tab="dienste">📅 Dienste</button>
+      <button class="tab" data-tab="statistik">📊 Statistik</button>
+      <button class="tab" data-tab="codes">🧬 Codes</button>
+    </nav>
+    <main>
     <section id="tab-dienste" class="tab-panel active">
       <div class="layout">
         <aside class="panel">
@@ -69,7 +69,8 @@
         </div>
       </div>
     </section>
-  </main>
+    </main>
+  </div>
 
   <dialog id="service-dialog">
     <form method="dialog" id="service-form" class="form">
@@ -99,7 +100,7 @@
         <div id="colleague-wrap" class="stack"></div>
       </div>
       <menu>
-        <button value="cancel" class="btn">Abbrechen</button>
+        <button value="cancel" class="btn" formnovalidate>Abbrechen</button>
         <button value="default" class="btn primary">Speichern</button>
       </menu>
     </form>
@@ -109,7 +110,7 @@
     <form method="dialog" id="incident-form" class="form">
       <h3>Einsatz erfassen</h3>
       <div class="incident-header-row">
-        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten">🚨</button>
+        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten"><span>🚨</span><small>Blaulicht</small></button>
         <label>Einsatznr.
           <span class="meta">ausklappen unten</span>
         </label>
@@ -160,7 +161,7 @@
       </details>
 
       <menu>
-        <button value="cancel" class="btn">Abbrechen</button>
+        <button value="cancel" class="btn" formnovalidate>Abbrechen</button>
         <button value="default" class="btn primary">Speichern</button>
       </menu>
     </form>

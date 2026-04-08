@@ -251,7 +251,7 @@ function openIncidentDialog(incidentId = null) {
 function setLightButton() {
   const b = byId('btn-lights-toggle');
   b.classList.toggle('off', !incidentLights);
-  b.textContent = incidentLights ? '🚨' : '🧰';
+  b.innerHTML = incidentLights ? '<span>🚨</span><small>Blaulicht</small>' : '<span>🧰</span><small>Kein Einsatz</small>';
 }
 
 function shouldAutoLights(code) {
