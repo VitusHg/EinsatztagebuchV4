@@ -1,7 +1,7 @@
 :root {
-  --bg: #0b1220;
-  --panel: #111a2b;
-  --card: #17243a;
+  --bg: #212121;
+  --panel: #262626;
+  --card: #2f2f2f;
   --text: #eef4ff;
   --muted: #b8c5df;
   --red: #e11d48;
@@ -13,12 +13,12 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; }
 body { margin: 0; font-family: system-ui, sans-serif; color: var(--text); background: var(--bg); overflow: hidden; }
-.topbar { background: linear-gradient(90deg, #1d4ed8, #7c3aed); padding: .7rem 1rem; display: grid; grid-template-columns: 1fr auto auto; gap: .8rem; align-items: center; }
+.topbar { background: #bb120f; padding: .7rem 1rem; display: grid; grid-template-columns: 1fr auto auto; gap: .8rem; align-items: center; }
 .brand { font-weight: 700; }
 .clock { font-size: 1.5rem; font-weight: 700; }
 .header-actions { display: flex; gap: .5rem; }
 .app-shell { display: grid; grid-template-columns: 280px 1fr; height: calc(100dvh - 68px); }
-.sidebar { background: #121820; border-right: 1px solid #25385d; padding: .75rem; display: grid; align-content: start; gap: .55rem; overflow: auto; }
+.sidebar { background: #1f1f1f; border-right: 1px solid #3a3a3a; padding: .75rem; display: grid; align-content: start; gap: .55rem; overflow: auto; }
 main { overflow: hidden; height: 100%; }
 .tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; padding: .7rem; background: #0f1a2d; }
 .tab { border: none; border-radius: .7rem; padding: .6rem; background: #1f2d49; color: var(--text); }
@@ -64,6 +64,14 @@ menu { display: flex; justify-content: flex-end; gap: .5rem; margin: 0; padding:
 .pill { padding: .2rem .45rem; border-radius: 999px; background: #1d2c49; font-size: .8rem; }
 .pill.blue { background: var(--blue); }
 .stats-grid { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.pie { width: 150px; aspect-ratio: 1; border-radius: 999px; margin: .25rem auto .5rem; background: conic-gradient(#334155 0deg 360deg); }
+.legend { display: grid; gap: .25rem; font-size: .86rem; color: var(--muted); }
+.dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 999px; margin-right: .45rem; vertical-align: middle; }
+.heatmap { display: grid; grid-template-columns: repeat(53, 10px); gap: 3px; overflow: auto; padding: .35rem 0; }
+.heat { width: 10px; height: 10px; border-radius: 2px; background: #374151; }
+.heat.lv1 { background: #166534; }
+.heat.lv2 { background: #22c55e; }
+.heat.lv3 { background: #86efac; }
 .expander { border: 1px solid #31456e; border-radius: .7rem; padding: .45rem .55rem; background: #162845; }
 .expander summary { cursor: pointer; font-weight: 600; }
 .expander[open] { background: #1d2c49; }

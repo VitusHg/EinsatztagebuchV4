@@ -74,7 +74,7 @@ function renderServiceList() {
     const start = s.startAt ? formatDateTime(s.startAt) : '-';
     const end = s.endAt ? formatDateTime(s.endAt) : '-';
     const weekday = new Date(s.startAt).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
-    card.innerHTML = `<h4>☀️ ${start} <span class="pill">${weekday}</span></h4>
+    card.innerHTML = `<h4>${s.isSeg ? '⚡' : '☀️'} ${start} <span class="pill">${s.isSeg ? 'SEG' : weekday}</span></h4>
       <div class="meta">📍 ${s.location}</div>
       <div class="meta">🚑 ${s.vehicle} · 👥 ${s.colleagues?.length || 0}</div>
       <div class="meta">📷 ${s.incidents.length} Einsätze · ⏱️ ${serviceHours(s)}</div>`;
@@ -87,9 +87,21 @@ function formatDateTime(value) {
   return new Date(value).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 }
 function serviceHours(service) {
+  if (service.isSeg) {
+    const i = service.incidents?.[0];
+    const d = durationFromTimes(i?.times);
+    return `${(d / 60).toFixed(1)}h`;
+  }
   if (!service.startAt || !service.endAt) return '-';
   const diffMin = Math.max(0, Math.round((new Date(service.endAt) - new Date(service.startAt)) / 60000));
   return `${(diffMin / 60).toFixed(1)}h`;
+}
+
+function durationFromTimes(times) {
+  const vals = Object.values(times || {}).filter(Boolean).sort();
+  if (vals.length < 2) return 0;
+  const m = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  return Math.max(0, m(vals.at(-1)) - m(vals[0]));
 }
 
 function selectService(id) {
@@ -131,18 +143,20 @@ function renderServiceDetail() {
 
 function renderStats() {
   const root = byId('stats');
-  const incidents = state.services.flatMap((s) => s.incidents);
+  const { services, incidents } = getFilteredData();
   const byAlarm = incidents.reduce((a, i) => ((a[i.alarmCode] = (a[i.alarmCode] || 0) + 1), a), {});
   const byPzc = incidents.filter((i) => i.pzc?.diag).reduce((a, i) => ((a[i.pzc.diag] = (a[i.pzc.diag] || 0) + 1), a), {});
   const topAlarm = Object.entries(byAlarm).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(', ') || '-';
   const topPzc = Object.entries(byPzc).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(', ') || '-';
-  const avgByShift = state.services.length ? (incidents.length / state.services.length).toFixed(1) : '0.0';
-  const durationHours = state.services.reduce((acc, s) => acc + (Number(serviceHours(s).replace('h', '')) || 0), 0).toFixed(1);
+  const shiftOnly = services.filter((s) => !s.isSeg);
+  const avgByShift = shiftOnly.length ? (incidents.length / shiftOnly.length).toFixed(1) : '0.0';
+  const durationHours = services.reduce((acc, s) => acc + (Number(serviceHours(s).replace('h', '')) || 0), 0).toFixed(1);
   const blueCount = incidents.filter((i) => i.lights).length;
   const transportCount = incidents.filter((i) => i.times?.['Transport']).length;
   const documentationRate = incidents.length ? Math.round((incidents.filter((i) => i.note).length / incidents.length) * 100) : 0;
   root.innerHTML = `<div class="card"><h4>📟 Einsätze gesamt</h4><strong>${incidents.length}</strong></div>
-    <div class="card"><h4>🗂️ Dienste gesamt</h4><strong>${state.services.length}</strong></div>
+    <div class="card"><h4>🗂️ Dienste gesamt</h4><strong>${shiftOnly.length}</strong></div>
+    <div class="card"><h4>⚡ SEG Einsätze</h4><strong>${services.filter((s) => s.isSeg).length}</strong></div>
     <div class="card"><h4>⏱️ Dienststunden</h4><strong>${durationHours}h</strong></div>
     <div class="card"><h4>📈 Ø Einsätze / Dienst</h4><strong>${avgByShift}</strong></div>
     <div class="card"><h4>🚨 Blaulichtquote</h4><strong>${incidents.length ? Math.round(100 * blueCount / incidents.length) : 0}%</strong><div class="meta">${blueCount}/${incidents.length}</div></div>
@@ -150,6 +164,65 @@ function renderStats() {
     <div class="card"><h4>📝 Dokumentationsquote</h4><strong>${documentationRate}%</strong></div>
     <div class="card"><h4>🏷️ Top Stichwörter</h4><div class="meta">${topAlarm}</div></div>
     <div class="card"><h4>🧬 Top PZC Diagnose</h4><div class="meta">${topPzc}</div></div>`;
+  renderPie('vehicle', services.map((s) => s.vehicle || 'Unbekannt'));
+  renderPie('station', services.map((s) => s.location || 'Unbekannt'));
+  renderHeatmap(incidents);
+}
+
+function getFilteredData() {
+  const from = byId('stats-from')?.value;
+  const to = byId('stats-to')?.value;
+  const inRange = (d) => {
+    if (!d) return true;
+    const day = d.slice(0, 10);
+    if (from && day < from) return false;
+    if (to && day > to) return false;
+    return true;
+  };
+  const services = state.services.filter((s) => inRange(s.startAt || ''));
+  const incidents = services.flatMap((s) => s.incidents || []);
+  return { services, incidents };
+}
+
+function renderPie(prefix, values) {
+  const map = values.reduce((a, x) => ((a[x] = (a[x] || 0) + 1), a), {});
+  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const total = entries.reduce((a, [, v]) => a + v, 0) || 1;
+  const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#14b8a6'];
+  let acc = 0;
+  const grad = entries.map(([, v], idx) => {
+    const start = (acc / total) * 360;
+    acc += v;
+    const end = (acc / total) * 360;
+    return `${colors[idx]} ${start}deg ${end}deg`;
+  }).join(', ');
+  const pie = byId(`${prefix}-pie`);
+  const legend = byId(`${prefix}-legend`);
+  if (!pie || !legend) return;
+  pie.style.background = `conic-gradient(${grad || '#334155 0deg 360deg'})`;
+  legend.innerHTML = entries.map(([k, v], idx) => `<div><span class="dot" style="background:${colors[idx]}"></span>${k} (${v})</div>`).join('');
+}
+
+function renderHeatmap(incidents) {
+  const box = byId('calendar-heatmap');
+  if (!box) return;
+  const counts = incidents.reduce((a, i) => {
+    const d = (i.createdAt || '').slice(0, 10);
+    if (!d) return a;
+    a[d] = (a[d] || 0) + 1;
+    return a;
+  }, {});
+  const days = [];
+  const start = new Date(new Date().getFullYear(), 0, 1);
+  for (let i = 0; i < 365; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const key = d.toISOString().slice(0, 10);
+    const c = counts[key] || 0;
+    const lv = c === 0 ? 0 : c < 2 ? 1 : c < 4 ? 2 : 3;
+    days.push(`<span class="heat lv${lv}" title="${key}: ${c}"></span>`);
+  }
+  box.innerHTML = days.join('');
 }
 
 function renderCodeLists() {
@@ -258,8 +331,8 @@ function shouldAutoLights(code) {
   return AUTO_LIGHTS_RE.test(code || '');
 }
 
-function buildTimeButtons() {
-  const root = byId('time-grid');
+function buildTimeButtons(targetId = 'time-grid') {
+  const root = byId(targetId);
   root.innerHTML = '';
   timeFields.forEach((name) => {
     const btn = document.createElement('button');
@@ -309,10 +382,18 @@ function updatePzcPreview() {
 }
 
 byId('btn-new-service').onclick = openServiceDialog;
+byId('btn-new-seg').onclick = () => {
+  const f = byId('seg-form');
+  f.reset();
+  buildTimeButtons('seg-time-grid');
+  byId('seg-dialog').showModal();
+};
 byId('btn-back').onclick = () => byId('service-detail-panel').classList.remove('show-mobile');
 byId('btn-new-incident').onclick = () => openIncidentDialog();
 byId('btn-add-colleague').onclick = () => addColleagueField('');
 byId('btn-lights-toggle').onclick = () => { incidentLights = !incidentLights; setLightButton(); };
+if (byId('stats-from')) byId('stats-from').onchange = renderStats;
+if (byId('stats-to')) byId('stats-to').onchange = renderStats;
 
 byId('service-form').onsubmit = (e) => {
   e.preventDefault();
@@ -356,6 +437,34 @@ byId('incident-form').onsubmit = (e) => {
   if (editingIncidentId) s.incidents = s.incidents.map((i) => i.id === editingIncidentId ? payload : i);
   else s.incidents.push(payload);
   byId('incident-dialog').close();
+  saveState();
+};
+
+byId('seg-form').onsubmit = (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const times = Object.fromEntries([...byId('seg-time-grid').querySelectorAll('.status-btn')].filter((b) => b.dataset.time).map((b) => [b.dataset.key, b.dataset.time]));
+  const seg = {
+    id: uid(),
+    isSeg: true,
+    startAt: `${f.date.value}T00:00`,
+    endAt: `${f.date.value}T23:59`,
+    location: f.location.value.trim(),
+    vehicle: f.vehicle.value.trim(),
+    colleagues: f.colleague.value.trim() ? [f.colleague.value.trim()] : [],
+    incidents: [{
+      id: uid(),
+      incidentNumber: `${new Date().getFullYear()}${String(Date.now()).slice(-6)}`,
+      alarmCode: f.alarmCode.value.trim(),
+      lights: shouldAutoLights(f.alarmCode.value.trim()),
+      times,
+      note: f.note.value.trim(),
+      createdAt: new Date().toISOString(),
+      pzc: { diag: '', age: '', prio: '' }
+    }]
+  };
+  state.services.push(seg);
+  byId('seg-dialog').close();
   saveState();
 };
 
@@ -460,6 +569,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 
 setupDialogDismiss(byId('service-dialog'));
 setupDialogDismiss(byId('incident-dialog'));
+setupDialogDismiss(byId('seg-dialog'));
 
 function setupDialogDismiss(dialog) {
   dialog.addEventListener('click', (e) => {
