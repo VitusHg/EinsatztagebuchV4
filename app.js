@@ -1,0 +1,793 @@
+const STORAGE_KEY = 'einsatzTagebuchV4';
+const timeFields = ['Alarmierung', 'Anfahrt', 'Am Einsatzort', 'Transport', 'Am Transportziel', 'Einsatz beendet'];
+const AUTO_LIGHTS_RE = /^(A\d|B1\b|B2\b|C1\b)/;
+
+const defaults = {
+  profile: { displayName: 'Privat' },
+  services: [],
+  alarmCodes: window.ALARM_CODES || [],
+  pzcCodes: window.PZC_CODES || []
+};
+
+let state = loadState();
+let selectedServiceId = null;
+let editingIncidentId = null;
+let editingServiceId = null;
+let incidentLights = false;
+let selectedCalendarYear = new Date().getFullYear();
+
+const byId = (id) => document.getElementById(id);
+
+function nowClock() {
+  byId('clock').textContent = new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+}
+setInterval(nowClock, 1000);
+nowClock();
+
+function loadState() {
+  try {
+    return normalizeState({ ...defaults, ...JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}') });
+  } catch {
+    return structuredClone(defaults);
+  }
+}
+
+function normalizeState(raw) {
+  return {
+    ...raw,
+    profile: raw.profile && typeof raw.profile === 'object' ? raw.profile : defaults.profile,
+    services: Array.isArray(raw.services) ? raw.services : [],
+    alarmCodes: uniqByCode(Array.isArray(raw.alarmCodes) ? raw.alarmCodes : defaults.alarmCodes),
+    pzcCodes: uniqByCode(Array.isArray(raw.pzcCodes) ? raw.pzcCodes : defaults.pzcCodes)
+  };
+}
+
+function uniqByCode(items) {
+  const seen = new Set();
+  return items.filter((x) => {
+    const c = x?.code?.trim();
+    if (!c || seen.has(c)) return false;
+    seen.add(c);
+    return true;
+  });
+}
+
+function saveState() {
+  state = normalizeState(state);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  render();
+}
+
+function uid() { return crypto.randomUUID(); }
+
+function render() {
+  renderServiceList();
+  renderServiceDetail();
+  renderStats();
+  renderCodeLists();
+}
+
+function renderServiceList() {
+  const list = byId('service-list');
+  list.innerHTML = '';
+  [...state.services].sort((a, b) => (b.startAt || '').localeCompare(a.startAt || '')).forEach((s) => {
+    const card = document.createElement('button');
+    card.className = 'card service-card';
+    const start = s.startAt ? formatDateTime(s.startAt) : '-';
+    const end = s.endAt ? formatDateTime(s.endAt) : '-';
+    const { icon, label } = shiftInfo(s);
+    card.innerHTML = `<h4 style="font-size:1.22rem">${icon} ${start} <span class="pill">${s.isSeg ? 'SEG' : label}</span></h4>
+      <div class="meta">📍 ${s.location}</div>
+      <div class="meta">🚑 ${s.vehicle}</div>
+      <div class="meta">📷 ${s.incidents.length} Einsätze · ⏱️ ${serviceHours(s)}</div>`;
+    card.onclick = () => selectService(s.id);
+    card.ondblclick = () => openServiceDialog(s.id);
+    list.append(card);
+  });
+}
+
+function shiftInfo(service) {
+  if (service.isSeg) return { icon: '⚡', label: 'SEG' };
+  const parsed = parseDateTimeParts(service.startAt);
+  const dt = parsed
+    ? new Date(parsed.year, parsed.month - 1, parsed.day, parsed.hour, parsed.minute)
+    : new Date(service.startAt);
+  const hour = parsed ? parsed.hour : dt.getHours();
+  const day = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][dt.getDay()];
+  const isDay = hour >= 5 && hour < 17;
+  return { icon: isDay ? '☀️' : '🌙', label: `${day}${isDay ? 'TA' : 'NA'}` };
+}
+
+function formatDateTime(value) {
+  const parsed = parseDateTimeParts(value);
+  if (parsed) return `${String(parsed.day).padStart(2, '0')}.${String(parsed.month).padStart(2, '0')}.${String(parsed.year).slice(-2)}, ${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`;
+  return new Date(value).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function parseDateTimeParts(value) {
+  const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return {
+    year: Number(m[1]),
+    month: Number(m[2]),
+    day: Number(m[3]),
+    hour: Number(m[4]),
+    minute: Number(m[5])
+  };
+}
+
+function toLocalDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function daysBetweenLocal(a, b) {
+  const start = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const end = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((end - start) / 86400000);
+}
+
+function serviceHours(service) {
+  if (service.isSeg) {
+    const i = service.incidents?.[0];
+    const d = durationFromTimes(i?.times);
+    return `${(d / 60).toFixed(1)}h`;
+  }
+  if (!service.startAt || !service.endAt) return '-';
+  const start = parseDateTimeParts(service.startAt);
+  const end = parseDateTimeParts(service.endAt);
+  const startDate = start
+    ? new Date(start.year, start.month - 1, start.day, start.hour, start.minute)
+    : new Date(service.startAt);
+  const endDate = end
+    ? new Date(end.year, end.month - 1, end.day, end.hour, end.minute)
+    : new Date(service.endAt);
+  const diffMin = Math.max(0, Math.round((endDate - startDate) / 60000));
+  return `${(diffMin / 60).toFixed(1)}h`;
+}
+
+function durationFromTimes(times) {
+  const vals = Object.values(times || {}).filter(Boolean).sort();
+  if (vals.length < 2) return 0;
+  const m = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  return Math.max(0, m(vals.at(-1)) - m(vals[0]));
+}
+
+function selectService(id) {
+  selectedServiceId = id;
+  renderServiceDetail();
+  byId('service-detail-panel').classList.add('show-mobile');
+}
+
+function serviceById() {
+  return state.services.find((s) => s.id === selectedServiceId);
+}
+
+function calcDuration(times) {
+  const vals = Object.values(times || {}).filter(Boolean).sort();
+  if (vals.length < 2) return '-';
+  const m = (t) => Number(t.slice(0, 2)) * 60 + Number(t.slice(3, 5));
+  const delta = m(vals.at(-1)) - m(vals[0]);
+  return delta > 0 ? `${Math.floor(delta / 60)}h ${delta % 60}m` : '-';
+}
+
+function renderServiceDetail() {
+  const s = serviceById();
+  byId('btn-new-incident').disabled = !s;
+  if (byId('btn-edit-service')) byId('btn-edit-service').disabled = !s;
+  byId('service-title').textContent = s ? `${s.vehicle} · ${s.location}` : 'Dienst auswählen';
+  byId('service-meta').textContent = s ? `${formatDateTime(s.startAt)} bis ${formatDateTime(s.endAt)} · Kollegen: ${(s.colleagues || []).join(', ') || '-'}` : '';
+  const list = byId('incident-list');
+  list.innerHTML = '';
+  if (!s) return;
+  s.incidents.forEach((i) => {
+    const card = document.createElement('article');
+    card.className = 'card';
+    const pzc = i.pzc?.diag ? `${i.pzc.diag}-${i.pzc.age || '--'}-${i.pzc.prio || '-'}` : '-';
+    const timeStrip = timeFields.map((f) => `<span class="pill ${i.times?.[f] ? 'blue' : ''}">${f}${i.times?.[f] ? ` ${i.times[f]}` : ''}</span>`).join(' ');
+    const no = i.incidentNumber ? `#${i.incidentNumber} · ` : '';
+    card.innerHTML = `<h4>${no}${i.alarmCode}</h4><div class="meta">${i.lights ? '🚨 Einsatz' : '🧰 Nicht-Einsatz'} · ⏱️ ${calcDuration(i.times)} · PZC ${pzc}</div><div>${timeStrip}</div>`;
+    card.onclick = () => openIncidentDialog(i.id);
+    list.append(card);
+  });
+}
+
+function renderStats() {
+  const root = byId('stats');
+  const { services, incidents } = getFilteredData();
+  const byAlarm = incidents.reduce((a, i) => ((a[i.alarmCode] = (a[i.alarmCode] || 0) + 1), a), {});
+  const byPzc = incidents.filter((i) => i.pzc?.diag).reduce((a, i) => ((a[i.pzc.diag] = (a[i.pzc.diag] || 0) + 1), a), {});
+  const shiftOnly = services.filter((s) => !s.isSeg);
+  const avgByShift = shiftOnly.length ? (incidents.length / shiftOnly.length).toFixed(1) : '0.0';
+  const durationHours = services.reduce((acc, s) => acc + (Number(serviceHours(s).replace('h', '')) || 0), 0).toFixed(1);
+  const blueCount = incidents.filter((i) => i.lights).length;
+  root.innerHTML = `<div class="card"><h4>📟 Einsätze gesamt</h4><strong>${incidents.length}</strong></div>
+    <div class="card"><h4>🗂️ Dienste gesamt</h4><strong>${shiftOnly.length}</strong></div>
+    <div class="card"><h4>⚡ SEG Einsätze</h4><strong>${services.filter((s) => s.isSeg).length}</strong></div>
+    <div class="card"><h4>⏱️ Dienststunden</h4><strong>${durationHours}h</strong></div>
+    <div class="card"><h4>📈 Ø Einsätze / Dienst</h4><strong>${avgByShift}</strong></div>
+    <div class="card"><h4>🚨 Blaulichtquote</h4><strong>${incidents.length ? Math.round(100 * blueCount / incidents.length) : 0}%</strong><div class="meta">${blueCount}/${incidents.length}</div></div>`;
+  renderPie('vehicle', services.map((s) => s.vehicle || 'Unbekannt'));
+  renderPie('station', services.map((s) => s.location || 'Unbekannt'));
+  renderPie('colleague', services.flatMap((s) => s.colleagues || []).filter(Boolean));
+  renderHeatmap(services);
+  byId('top-alarm-list').innerHTML = Object.entries(byAlarm).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k}<strong style=\"float:right\">${v}</strong></div>`).join('');
+  byId('top-pzc-list').innerHTML = Object.entries(byPzc).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k} · ${pzcDiagnosis(k)}<strong style=\"float:right\">${v}</strong></div>`).join('');
+}
+
+function getFilteredData() {
+  const from = byId('stats-from')?.value;
+  const to = byId('stats-to')?.value;
+  const inRange = (d) => {
+    if (!d) return true;
+    const day = d.slice(0, 10);
+    if (from && day < from) return false;
+    if (to && day > to) return false;
+    return true;
+  };
+  const services = state.services.filter((s) => inRange(s.startAt || ''));
+  const incidents = services.flatMap((s) => s.incidents || []);
+  return { services, incidents };
+}
+
+function renderPie(prefix, values) {
+  const map = values.reduce((a, x) => ((a[x] = (a[x] || 0) + 1), a), {});
+  const allEntries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  let entries = allEntries.slice(0, 10);
+  if (allEntries.length > 10) {
+    const other = allEntries.slice(10).reduce((a, [, v]) => a + v, 0);
+    entries = [...entries, ['Anderes', other]];
+  }
+  const total = entries.reduce((a, [, v]) => a + v, 0) || 1;
+  const colors = entries.map((_, idx) => `hsl(${(idx * 37) % 360} 78% 58%)`);
+  let acc = 0;
+  const grad = entries.map(([, v], idx) => {
+    const start = (acc / total) * 360;
+    acc += v;
+    const end = (acc / total) * 360;
+    return `${colors[idx]} ${start}deg ${end}deg`;
+  }).join(', ');
+  const pie = byId(`${prefix}-pie`);
+  const legend = byId(`${prefix}-legend`);
+  if (!pie || !legend) return;
+  pie.style.background = `conic-gradient(${grad || '#334155 0deg 360deg'})`;
+  legend.innerHTML = entries.map(([k, v], idx) => `<div><span class="dot" style="background:${colors[idx]}"></span>${k} (${v})</div>`).join('');
+  pie.onclick = () => openRankingDialog(
+    prefix === 'vehicle' ? 'Fahrzeugranking' : prefix === 'station' ? 'Dienststellenranking' : 'Kollegenranking',
+    allEntries
+  );
+}
+
+function renderHeatmap(services) {
+  const box = byId('calendar-heatmap');
+  if (!box) return;
+  const years = [...new Set(services.map((s) => (s.startAt || '').slice(0, 4)).filter(Boolean).map(Number))].sort((a, b) => a - b);
+  const yearList = byId('calendar-year-list');
+  const limited = years.slice(-5);
+  if (limited.length && !limited.includes(selectedCalendarYear)) selectedCalendarYear = limited.at(-1);
+  if (yearList) {
+    yearList.innerHTML = limited.map((y) => `<button type="button" class="year-btn ${y === selectedCalendarYear ? 'active' : ''}" data-year="${y}">${y}</button>`).join('');
+    [...yearList.querySelectorAll('.year-btn')].forEach((btn) => btn.onclick = () => {
+      selectedCalendarYear = Number(btn.dataset.year);
+      renderStats();
+    });
+  }
+  const dayStats = services.reduce((a, s) => {
+    const d = (s.startAt || '').slice(0, 10);
+    if (!d) return a;
+    if (Number(d.slice(0, 4)) !== selectedCalendarYear) return a;
+    if (!a[d]) a[d] = { services: 0, incidents: 0 };
+    a[d].services += 1;
+    a[d].incidents += (s.incidents || []).length;
+    return a;
+  }, {});
+  const days = [];
+  const start = new Date(selectedCalendarYear, 0, 1);
+  const end = new Date(selectedCalendarYear + 1, 0, 1);
+  const totalDays = daysBetweenLocal(start, end);
+  const startWeekday = (start.getDay() + 6) % 7; // Mo=0 ... So=6
+  const gridStart = new Date(start);
+  gridStart.setDate(start.getDate() - startWeekday);
+  const totalCells = Math.ceil((startWeekday + totalDays) / 7) * 7;
+  const weekCount = Math.ceil(totalCells / 7);
+  box.style.gridTemplateColumns = `repeat(${weekCount}, 14px)`;
+  byId('calendar-days-label').innerHTML = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => `<span>${d}</span>`).join('');
+  const monthRow = byId('calendar-months');
+  monthRow.style.gridTemplateColumns = `repeat(${weekCount}, 14px)`;
+  const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  monthRow.innerHTML = months.map((label, monthIdx) => {
+    const monthDate = new Date(selectedCalendarYear, monthIdx, 1);
+    const weekIndex = Math.floor(daysBetweenLocal(gridStart, monthDate) / 7);
+    return `<span style="grid-column:${weekIndex + 1}">${label}</span>`;
+  }).join('');
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
+    const key = toLocalDateKey(d);
+    if (key < `${selectedCalendarYear}-01-01` || key > `${selectedCalendarYear}-12-31`) {
+      days.push('<span class="heat outside-year" aria-hidden="true"></span>');
+      continue;
+    }
+    const stats = dayStats[key] || { services: 0, incidents: 0 };
+    const c = stats.incidents;
+    const hasService = stats.services > 0;
+    let lv = 'lv0';
+    if (hasService && c === 0) lv = 'lv-service';
+    else if (c > 0 && c <= 2) lv = 'lv1';
+    else if (c > 2 && c <= 4) lv = 'lv2';
+    else if (c > 4 && c <= 6) lv = 'lv3';
+    else if (c > 6 && c <= 8) lv = 'lv4';
+    else if (c > 8 && c <= 10) lv = 'lv5';
+    else if (c > 10) lv = 'lv6';
+    const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    const title = c
+      ? `${dayLabel} · ${c} Fahrten`
+      : hasService
+        ? `${dayLabel} · Dienst ohne Fahrten`
+        : `${dayLabel} · Kein Dienst`;
+    days.push(`<span class="heat ${lv}" title="${title}"></span>`);
+  }
+  box.innerHTML = days.join('');
+}
+
+function openRankingDialog(title, entries) {
+  byId('ranking-title').textContent = title;
+  const list = byId('ranking-list');
+  list.innerHTML = entries.map(([name, count], idx) => `<div class="card">${idx + 1}. ${name}<strong style="float:right">${count}</strong></div>`).join('');
+  list.scrollTop = 0;
+  const d = byId('ranking-dialog');
+  d.showModal();
+  d.querySelector('.form').scrollTop = 0;
+}
+
+function renderCodeLists() {
+  byId('alarm-code-list').innerHTML = state.alarmCodes.slice(0, 250).map((c) => `<div class="card">${c.code}</div>`).join('');
+  byId('pzc-code-list').innerHTML = state.pzcCodes.slice(0, 250).map((p) => `<div class="card">${p.code} → ${p.diagnosis}</div>`).join('');
+}
+
+function mountSuggestions(input, containerId, items, max = 8) {
+  const box = byId(containerId);
+  let isOpen = false;
+  const renderItems = () => {
+    const q = input.value.toLowerCase().trim();
+    const results = items.filter((x) => x.toLowerCase().includes(q)).slice(0, max);
+    box.innerHTML = results.map((x) => `<button type="button" class="dropdown-item">${x}</button>`).join('');
+    box.classList.toggle('open', isOpen && results.length > 0);
+    [...box.querySelectorAll('.dropdown-item')].forEach((btn) => btn.onclick = () => {
+      input.value = btn.textContent;
+      isOpen = false;
+      renderItems();
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  };
+  input.addEventListener('focus', () => { isOpen = true; renderItems(); });
+  input.addEventListener('input', () => { isOpen = true; renderItems(); });
+  input.addEventListener('blur', () => setTimeout(() => { isOpen = false; renderItems(); }, 120));
+  renderItems();
+}
+
+function collectHistoryValues(key) {
+  const set = new Set();
+  state.services.forEach((s) => {
+    if (Array.isArray(s[key])) s[key].forEach((v) => set.add(v));
+    else if (s[key]) set.add(s[key]);
+  });
+  return [...set].sort();
+}
+
+function collectHistorySorted(key) {
+  const map = {};
+  state.services.forEach((s) => {
+    const add = (v) => { if (!v) return; map[v] = (map[v] || 0) + 1; };
+    if (Array.isArray(s[key])) s[key].forEach(add); else add(s[key]);
+  });
+  return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+}
+
+function addColleagueField(value = '', targetId = 'colleague-wrap') {
+  const wrap = byId(targetId);
+  const row = document.createElement('div');
+  row.className = 'incident-no-wrap';
+  row.innerHTML = `<input class="colleague-input" value="${value}" placeholder="Kollege/Kollegin"><button type="button" class="btn">−</button><div class="suggest-list"></div>`;
+  row.querySelector('button').onclick = () => row.remove();
+  const input = row.querySelector('input');
+  const suggestBox = row.querySelector('.suggest-list');
+  const pool = collectHistoryValues('colleagues');
+  const redraw = () => {
+    const q = input.value.toLowerCase().trim();
+    suggestBox.innerHTML = pool.filter((x) => x.toLowerCase().includes(q)).slice(0, 6).map((x) => `<button type="button" class="suggest">${x}</button>`).join('');
+    [...suggestBox.querySelectorAll('.suggest')].forEach((b) => b.onclick = () => { input.value = b.textContent; redraw(); });
+  };
+  input.addEventListener('input', redraw);
+  redraw();
+  wrap.append(row);
+}
+
+function openServiceDialog(serviceId = null) {
+  editingServiceId = serviceId;
+  const form = byId('service-form');
+  form.reset();
+  byId('colleague-wrap').innerHTML = '';
+  const edit = serviceId ? state.services.find((s) => s.id === serviceId) : null;
+  if (edit) {
+    form.startAt.value = edit.startAt || '';
+    form.endAt.value = edit.endAt || '';
+    form.location.value = edit.location || '';
+    form.vehicle.value = edit.vehicle || '';
+  }
+  if (!edit) {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    form.startAt.value = local;
+    form.endAt.value = local;
+  }
+  (edit?.colleagues?.length ? edit.colleagues : ['']).forEach((c) => addColleagueField(c));
+  mountSuggestions(form.location, 'service-location-suggest', collectHistorySorted('location'));
+  mountSuggestions(form.vehicle, 'service-vehicle-suggest', collectHistorySorted('vehicle'));
+  byId('service-dialog').showModal();
+}
+
+function openIncidentDialog(incidentId = null) {
+  editingIncidentId = incidentId;
+  const form = byId('incident-form');
+  form.reset();
+  buildTimeButtons();
+  mountSuggestions(form.alarmCode, 'alarm-suggest', state.alarmCodes.map((a) => a.code), 10);
+  incidentLights = false;
+  setLightButton();
+
+  if (incidentId) {
+    const i = serviceById().incidents.find((x) => x.id === incidentId);
+    form.incidentNumber.value = i.incidentNumber || '';
+    form.alarmCode.value = i.alarmCode;
+    incidentLights = !!i.lights;
+    form.note.value = i.note || '';
+    form.pzcDiag.value = i.pzc?.diag || '';
+    form.pzcAge.value = i.pzc?.age || '';
+    form.pzcPrio.value = i.pzc?.prio || '';
+    [...byId('time-grid').querySelectorAll('.status-btn')].forEach((entry) => {
+      const t = i.times?.[entry.dataset.key];
+      const input = entry.querySelector('input');
+      if (t && input) {
+        entry.dataset.time = t;
+        entry.classList.add('on');
+        input.value = t;
+      }
+    });
+    setLightButton();
+  }
+  updatePzcPreview();
+  byId('incident-dialog').showModal();
+}
+
+function setLightButton() {
+  const b = byId('btn-lights-toggle');
+  b.classList.toggle('off', !incidentLights);
+  b.innerHTML = incidentLights
+    ? '<img class=\"light-icon\" src=\"lights_on.svg\" alt=\"Blaulicht an\"><small>Blaulicht</small>'
+    : '<img class=\"light-icon\" src=\"lights_off.svg\" alt=\"Blaulicht aus\"><small>Kein Einsatz</small>';
+}
+
+function shouldAutoLights(code) {
+  return AUTO_LIGHTS_RE.test(code || '');
+}
+
+function normalizeTime(value) {
+  const raw = String(value || '').trim();
+  let hh = null;
+  let mm = null;
+  if (raw.includes(':')) {
+    const m = raw.match(/^(\d{1,2}):(\d{1,2})$/);
+    if (!m) return '';
+    hh = Number(m[1]);
+    mm = Number(m[2]);
+  } else {
+    const digits = raw.replace(/\D/g, '').slice(0, 4);
+    if (digits.length < 3) return '';
+    const full = digits.length === 3 ? `0${digits}` : digits;
+    hh = Number(full.slice(0, 2));
+    mm = Number(full.slice(2, 4));
+  }
+  if (hh > 23 || mm > 59) return '';
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
+function buildTimeButtons(targetId = 'time-grid') {
+  const root = byId(targetId);
+  root.innerHTML = '';
+  timeFields.forEach((name) => {
+    const btn = document.createElement('div');
+    btn.className = 'status-btn';
+    btn.dataset.key = name;
+    btn.innerHTML = `<strong>${name}</strong><input type="text" inputmode="numeric" placeholder="HHMM / HH:MM" maxlength="5">`;
+    const input = btn.querySelector('input');
+    const writeTime = (value) => {
+      if (!input) return;
+      btn.dataset.time = value;
+      btn.classList.add('on');
+      input.value = value;
+    };
+    let longPressTimer = null;
+    let consumed = false;
+    const startWrite = () => {
+      consumed = false;
+      longPressTimer = setTimeout(() => {
+        const now = new Date().toTimeString().slice(0, 5);
+        writeTime(now);
+        consumed = true;
+      }, 520);
+    };
+    btn.addEventListener('pointerdown', startWrite);
+    btn.addEventListener('pointerup', () => clearTimeout(longPressTimer));
+    btn.addEventListener('pointerleave', () => clearTimeout(longPressTimer));
+    btn.addEventListener('dblclick', (e) => {
+      e.preventDefault();
+      const now = new Date().toTimeString().slice(0, 5);
+      writeTime(now);
+      consumed = true;
+    });
+    input?.addEventListener('focus', () => { consumed = false; });
+    input?.addEventListener('input', () => {
+      const formatted = normalizeTime(input.value);
+      if (formatted) {
+        writeTime(formatted);
+      } else {
+        btn.dataset.time = '';
+        btn.classList.remove('on');
+      }
+    });
+    input?.addEventListener('blur', () => {
+      const formatted = normalizeTime(input.value);
+      input.value = formatted;
+      if (formatted) writeTime(formatted);
+    });
+    root.append(btn);
+  });
+}
+
+function updatePzcPreview() {
+  const f = byId('incident-form');
+  const diag = f.pzcDiag.value.replace(/\D/g, '').slice(0, 3);
+  f.pzcDiag.value = diag;
+  const age = f.pzcAge.value.replace(/\D/g, '').slice(0, 2);
+  f.pzcAge.value = age;
+  let prio = f.pzcPrio.value.replace(/\D/g, '').slice(0, 1);
+  if (prio && !['1', '2', '3'].includes(prio)) prio = '';
+  f.pzcPrio.value = prio;
+  const txt = state.pzcCodes.find((p) => p.code === diag)?.diagnosis || '-';
+  const prioText = prio === '1'
+    ? 'Kritischer Patient'
+    : prio === '2'
+      ? 'Voraussichtl. Stationäre Behandlung'
+      : prio === '3'
+        ? 'Voraussichtl. Ambulante Behandlung'
+        : '-';
+  byId('pzc-preview').textContent = `Aufgelöst: ${txt} - ${age || '-'} - ${prioText}`;
+}
+
+byId('btn-new-service').onclick = openServiceDialog;
+if (byId('btn-edit-service')) byId('btn-edit-service').onclick = () => selectedServiceId && openServiceDialog(selectedServiceId);
+byId('btn-new-seg').onclick = () => {
+  const f = byId('seg-form');
+  f.reset();
+  byId('seg-colleague-wrap').innerHTML = '';
+  addColleagueField('', 'seg-colleague-wrap');
+  buildTimeButtons('seg-time-grid');
+  mountSuggestions(f.location, 'seg-location-suggest', collectHistorySorted('location'));
+  mountSuggestions(f.vehicle, 'seg-vehicle-suggest', collectHistorySorted('vehicle'));
+  mountSuggestions(f.alarmCode, 'seg-alarm-suggest', state.alarmCodes.map((a) => a.code), 10);
+  byId('seg-dialog').showModal();
+};
+byId('btn-back').onclick = () => byId('service-detail-panel').classList.remove('show-mobile');
+byId('btn-new-incident').onclick = () => openIncidentDialog();
+byId('btn-add-colleague').onclick = () => addColleagueField('');
+if (byId('btn-add-seg-colleague')) byId('btn-add-seg-colleague').onclick = () => addColleagueField('', 'seg-colleague-wrap');
+byId('btn-lights-toggle').onclick = () => { incidentLights = !incidentLights; setLightButton(); };
+if (byId('stats-from')) byId('stats-from').onchange = renderStats;
+if (byId('stats-to')) byId('stats-to').onchange = renderStats;
+if (byId('settings-export')) byId('settings-export').onclick = exportData;
+if (byId('settings-import')) byId('settings-import').onchange = importData;
+
+byId('service-form').onsubmit = (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const colleagues = [...byId('colleague-wrap').querySelectorAll('.colleague-input')].map((x) => x.value.trim()).filter(Boolean);
+  const service = {
+    id: editingServiceId || uid(),
+    startAt: f.startAt.value,
+    endAt: f.endAt.value,
+    location: f.location.value.trim(),
+    vehicle: f.vehicle.value.trim(),
+    colleagues,
+    incidents: editingServiceId ? (state.services.find((s) => s.id === editingServiceId)?.incidents || []) : []
+  };
+  if (editingServiceId) state.services = state.services.map((s) => s.id === editingServiceId ? { ...s, ...service } : s);
+  else state.services.push(service);
+  selectedServiceId = service.id;
+  editingServiceId = null;
+  byId('service-dialog').close();
+  saveState();
+};
+
+byId('incident-form').onsubmit = (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const alarmCode = f.alarmCode.value.trim();
+  if (!alarmCode) return alert('Bitte mindestens ein Stichwort eingeben.');
+  const times = Object.fromEntries([...byId('time-grid').querySelectorAll('.status-btn')].filter((b) => b.dataset.time).map((b) => [b.dataset.key, b.dataset.time]));
+  const payload = {
+    id: editingIncidentId || uid(),
+    incidentNumber: f.incidentNumber.value.trim(),
+    alarmCode,
+    lights: shouldAutoLights(alarmCode) ? true : incidentLights,
+    times,
+    note: f.note.value.trim(),
+    createdAt: new Date().toISOString(),
+    pzc: { diag: f.pzcDiag.value.trim(), age: f.pzcAge.value.trim(), prio: f.pzcPrio.value.trim() }
+  };
+  const s = serviceById();
+  if (editingIncidentId) s.incidents = s.incidents.map((i) => i.id === editingIncidentId ? payload : i);
+  else s.incidents.push(payload);
+  byId('incident-dialog').close();
+  saveState();
+};
+
+byId('seg-form').onsubmit = (e) => {
+  e.preventDefault();
+  const f = e.target;
+  const segColleagues = [...byId('seg-colleague-wrap').querySelectorAll('.colleague-input')].map((x) => x.value.trim()).filter(Boolean);
+  const times = Object.fromEntries([...byId('seg-time-grid').querySelectorAll('.status-btn')].filter((b) => b.dataset.time).map((b) => [b.dataset.key, b.dataset.time]));
+  const seg = {
+    id: uid(),
+    isSeg: true,
+    startAt: `${f.date.value}T00:00`,
+    endAt: `${f.date.value}T23:59`,
+    location: f.location.value.trim(),
+    vehicle: f.vehicle.value.trim(),
+    colleagues: segColleagues,
+    incidents: [{
+      id: uid(),
+      incidentNumber: '',
+      alarmCode: f.alarmCode.value.trim(),
+      lights: shouldAutoLights(f.alarmCode.value.trim()),
+      times,
+      note: f.note.value.trim(),
+      createdAt: new Date().toISOString(),
+      pzc: { diag: '', age: '', prio: '' }
+    }]
+  };
+  state.services.push(seg);
+  byId('seg-dialog').close();
+  saveState();
+};
+
+byId('incident-form').alarmCode.addEventListener('input', (e) => {
+  if (shouldAutoLights(e.target.value.trim())) {
+    incidentLights = true;
+    setLightButton();
+  }
+});
+['pzcDiag', 'pzcAge', 'pzcPrio'].forEach((k) => byId('incident-form')[k].addEventListener('input', updatePzcPreview));
+byId('incident-form').pzcDiag.addEventListener('input', (e) => {
+  if (e.target.value.replace(/\D/g, '').slice(0, 3).length >= 3) byId('incident-form').pzcAge.focus();
+});
+byId('incident-form').pzcAge.addEventListener('input', (e) => {
+  if (e.target.value.replace(/\D/g, '').slice(0, 2).length >= 2) byId('incident-form').pzcPrio.focus();
+});
+
+function exportData() {
+  const exportPayload = toCompatExport(state);
+  const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `einsatztagebuch-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+}
+
+async function importData(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const imported = JSON.parse(await file.text());
+  state = normalizeState(fromCompatibleImport(imported));
+  saveState();
+}
+
+function toCompatExport(source) {
+  return {
+    exportedAt: new Date().toISOString(),
+    user: { displayName: source.profile?.displayName || 'Privat' },
+    shifts: source.services.map((s) => {
+      const start = s.startAt || null;
+      const end = s.endAt || null;
+      const duration = start && end ? Number((((new Date(end)) - (new Date(start))) / 3600000).toFixed(2)) : 0;
+      return {
+        shiftId: s.id,
+        startTime: start,
+        endTime: end,
+        duration,
+        location: s.location || '',
+        resource: s.vehicle || '',
+        tip: 0,
+        note: s.note || '',
+        crew: s.colleagues || [],
+        missions: (s.incidents || []).map((m) => ({
+          missionId: m.id,
+          title: m.alarmCode || '',
+          emergency: !!m.lights,
+          tip: 0,
+          note: m.note || '',
+          creation: m.createdAt || new Date().toISOString(),
+          highlighted: false,
+          incidentNumber: m.incidentNumber || '',
+          times: m.times || {},
+          pzc: m.pzc || {}
+        }))
+      };
+    })
+  };
+}
+
+function fromCompatibleImport(payload) {
+  if (Array.isArray(payload?.services)) return { ...defaults, ...payload };
+  if (!Array.isArray(payload?.shifts)) return { ...defaults };
+  return {
+    ...defaults,
+    profile: { displayName: payload?.user?.displayName || 'Privat' },
+    services: payload.shifts.map((shift) => ({
+      id: shift.shiftId || uid(),
+      startAt: shift.startTime || '',
+      endAt: shift.endTime || '',
+      location: shift.location || '',
+      vehicle: shift.resource || '',
+      note: shift.note || '',
+      colleagues: Array.isArray(shift.crew) ? shift.crew : [],
+      incidents: (shift.missions || []).map((m) => ({
+        id: m.missionId || uid(),
+        incidentNumber: m.incidentNumber || '',
+        alarmCode: m.title || '',
+        lights: !!m.emergency,
+        times: m.times || {},
+        note: m.note || '',
+        createdAt: m.creation || new Date().toISOString(),
+        pzc: m.pzc || { diag: '', age: '', prio: '' }
+      }))
+    }))
+  };
+}
+
+document.querySelectorAll('.tab').forEach((t) => {
+  t.onclick = () => {
+    document.querySelectorAll('.tab').forEach((x) => x.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach((x) => x.classList.remove('active'));
+    t.classList.add('active');
+    byId(`tab-${t.dataset.tab}`).classList.add('active');
+  };
+});
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+
+setupDialogDismiss(byId('service-dialog'));
+setupDialogDismiss(byId('incident-dialog'));
+setupDialogDismiss(byId('seg-dialog'));
+setupDialogDismiss(byId('ranking-dialog'));
+
+function setupDialogDismiss(dialog) {
+  dialog.addEventListener('click', (e) => {
+    const box = dialog.querySelector('.form').getBoundingClientRect();
+    const inside = e.clientX >= box.left && e.clientX <= box.right && e.clientY >= box.top && e.clientY <= box.bottom;
+    if (!inside) dialog.close();
+  });
+}
+
+render();
+document.querySelectorAll('.hour-btn').forEach((btn) => {
+  btn.onclick = () => {
+    const f = byId('service-form');
+    if (!f.startAt.value) return;
+    const d = new Date(f.startAt.value);
+    d.setHours(d.getHours() + Number(btn.dataset.hours));
+    f.endAt.value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+});
