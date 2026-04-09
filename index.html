@@ -200,44 +200,26 @@
   <dialog id="incident-dialog">
     <form method="dialog" id="incident-form" class="form">
       <h3>Einsatz erfassen</h3>
-      <div class="incident-header-row">
+      <div class="incident-top-row">
         <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten"><img class="light-icon" src="lights_on.svg" alt="Blaulicht"><small>Blaulicht</small></button>
-        <label>Einsatznr.
-          <span class="meta">ausklappen unten</span>
-        </label>
+        <div id="time-grid" class="status-grid time-inline"></div>
+      </div>
+      <div class="incident-header-row">
         <label>Stichwort
           <div class="dropdown-wrap">
             <input name="alarmCode" autocomplete="off" placeholder="Code auswählen" required>
             <div id="alarm-suggest" class="dropdown-list"></div>
           </div>
         </label>
-      </div>
-      <details class="expander">
-        <summary>Einsatznummer</summary>
-        <div class="incident-no-wrap">
-          <span id="incident-year-prefix"></span>
-          <input name="incidentSuffix" maxlength="6" inputmode="numeric" pattern="\d{6}" placeholder="000001">
-        </div>
-      </details>
-
-      <details class="expander">
-        <summary>Zeiten</summary>
-        <div id="time-grid" class="status-grid"></div>
-      </details>
-
-      <details class="expander">
-        <summary>Kommentar / Notiz</summary>
-        <label>
-          <textarea name="note" rows="4" placeholder="Anmerkungen / Kommentare"></textarea>
+        <label>Einsatznr.
+          <input name="incidentNumber" placeholder="optional">
         </label>
-      </details>
-
-      <details class="expander">
-        <summary>PZC</summary>
+      </div>
+      <div>
         <div class="pzc-row">
           <div>
             <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
-            <small>Diagnosecode</small>
+            <small>Diagnose</small>
           </div>
           <div>
             <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
@@ -245,11 +227,15 @@
           </div>
           <div>
             <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
-            <small>Priorität</small>
+            <small>Prio</small>
           </div>
         </div>
-        <p id="pzc-preview" class="meta">Diagnose: -</p>
-      </details>
+        <p id="pzc-preview" class="meta">Aufgelöst: -</p>
+      </div>
+
+      <label>Kommentar / Notiz
+        <textarea name="note" rows="4" placeholder="Anmerkungen / Kommentare"></textarea>
+      </label>
 
       <menu>
         <button value="cancel" class="btn" formnovalidate>Abbrechen</button>
