@@ -244,16 +244,33 @@ function renderHeatmap(services) {
     return a;
   }, {});
   const days = [];
-  byId('calendar-months').innerHTML = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
-    .map((m) => `<span>${m}</span>`).join('');
-  byId('calendar-days-label').innerHTML = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => `<span>${d}</span>`).join('');
   const start = new Date(selectedCalendarYear, 0, 1);
   const end = new Date(selectedCalendarYear + 1, 0, 1);
-  const totalDays = Math.round((end - start) / 86400000);
-  for (let i = 0; i < totalDays; i++) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
+  const dayMs = 86400000;
+  const totalDays = Math.round((end - start) / dayMs);
+  const startWeekday = (start.getDay() + 6) % 7; // Mo=0 ... So=6
+  const gridStart = new Date(start);
+  gridStart.setDate(start.getDate() - startWeekday);
+  const totalCells = Math.ceil((startWeekday + totalDays) / 7) * 7;
+  const weekCount = Math.ceil(totalCells / 7);
+  box.style.gridTemplateColumns = `repeat(${weekCount}, 14px)`;
+  byId('calendar-days-label').innerHTML = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => `<span>${d}</span>`).join('');
+  const monthRow = byId('calendar-months');
+  monthRow.style.gridTemplateColumns = `repeat(${weekCount}, 14px)`;
+  const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  monthRow.innerHTML = months.map((label, monthIdx) => {
+    const monthDate = new Date(selectedCalendarYear, monthIdx, 1);
+    const weekIndex = Math.floor((monthDate - gridStart) / dayMs / 7);
+    return `<span style="grid-column:${weekIndex + 1}">${label}</span>`;
+  }).join('');
+  for (let i = 0; i < totalCells; i++) {
+    const d = new Date(gridStart);
+    d.setDate(gridStart.getDate() + i);
     const key = d.toISOString().slice(0, 10);
+    if (key < `${selectedCalendarYear}-01-01` || key > `${selectedCalendarYear}-12-31`) {
+      days.push('<span class="heat outside-year" aria-hidden="true"></span>');
+      continue;
+    }
     const stats = dayStats[key] || { services: 0, incidents: 0 };
     const c = stats.incidents;
     const hasService = stats.services > 0;
