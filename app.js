@@ -88,15 +88,32 @@ function renderServiceList() {
 
 function shiftInfo(service) {
   if (service.isSeg) return { icon: '⚡', label: 'SEG' };
-  const dt = new Date(service.startAt);
-  const hour = dt.getHours();
+  const parsed = parseDateTimeParts(service.startAt);
+  const dt = parsed
+    ? new Date(parsed.year, parsed.month - 1, parsed.day, parsed.hour, parsed.minute)
+    : new Date(service.startAt);
+  const hour = parsed ? parsed.hour : dt.getHours();
   const day = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][dt.getDay()];
   const isDay = hour >= 5 && hour < 17;
   return { icon: isDay ? '☀️' : '🌙', label: `${day}${isDay ? 'TA' : 'NA'}` };
 }
 
 function formatDateTime(value) {
+  const parsed = parseDateTimeParts(value);
+  if (parsed) return `${String(parsed.day).padStart(2, '0')}.${String(parsed.month).padStart(2, '0')}.${String(parsed.year).slice(-2)}, ${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`;
   return new Date(value).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function parseDateTimeParts(value) {
+  const m = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return null;
+  return {
+    year: Number(m[1]),
+    month: Number(m[2]),
+    day: Number(m[3]),
+    hour: Number(m[4]),
+    minute: Number(m[5])
+  };
 }
 
 function toLocalDateKey(date) {
@@ -119,7 +136,15 @@ function serviceHours(service) {
     return `${(d / 60).toFixed(1)}h`;
   }
   if (!service.startAt || !service.endAt) return '-';
-  const diffMin = Math.max(0, Math.round((new Date(service.endAt) - new Date(service.startAt)) / 60000));
+  const start = parseDateTimeParts(service.startAt);
+  const end = parseDateTimeParts(service.endAt);
+  const startDate = start
+    ? new Date(start.year, start.month - 1, start.day, start.hour, start.minute)
+    : new Date(service.startAt);
+  const endDate = end
+    ? new Date(end.year, end.month - 1, end.day, end.hour, end.minute)
+    : new Date(service.endAt);
+  const diffMin = Math.max(0, Math.round((endDate - startDate) / 60000));
   return `${(diffMin / 60).toFixed(1)}h`;
 }
 
