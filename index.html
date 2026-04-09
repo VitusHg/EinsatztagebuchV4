@@ -28,6 +28,7 @@
           <div class="panel-head">
             <h2>Dienste</h2>
             <div class="header-actions">
+              <input id="service-search" class="search-input" placeholder="Suche (Datum, Fahrzeug, Kolleg:innen, Ort, Notiz)">
               <button id="btn-new-service" class="btn primary">+ Dienst</button>
               <button id="btn-new-seg" class="btn">+ SEG</button>
             </div>
@@ -44,7 +45,7 @@
               <button id="btn-new-incident" class="btn primary" disabled>+ Einsatz</button>
             </div>
           </div>
-          <div id="service-meta" class="meta"></div>
+          <div id="service-meta" class="card service-summary"></div>
           <div id="incident-list" class="card-list"></div>
         </section>
       </div>
@@ -201,7 +202,7 @@
     <form method="dialog" id="incident-form" class="form">
       <h3>Einsatz erfassen</h3>
       <div class="incident-top-row">
-        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten"><img class="light-icon" src="lights_on.svg" alt="Blaulicht"><small>Blaulicht</small></button>
+        <button id="btn-lights-toggle" type="button" class="light-toggle" title="Einsatz/Blaulicht umschalten"><img class="light-icon" src="lights_on.svg" alt="Blaulicht"></button>
         <div id="time-grid" class="status-grid time-inline"></div>
       </div>
       <div class="incident-header-row">
@@ -213,10 +214,17 @@
         </label>
       </div>
       <div>
-        <div class="pzc-row pzc-composite">
-          <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
-          <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
-          <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
+        <div class="pzc-row">
+          <span class="pzc-label">PZC</span>
+          <div class="pzc-composite">
+            <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
+            <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
+            <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
+          </div>
+          <div class="dropdown-wrap">
+            <input id="pzc-search" placeholder="PZC suchen (z. B. Atemwegsinfekt)">
+            <div id="pzc-search-suggest" class="dropdown-list"></div>
+          </div>
         </div>
         <p id="pzc-preview" class="meta">-</p>
       </div>

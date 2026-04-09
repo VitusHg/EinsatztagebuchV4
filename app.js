@@ -15,6 +15,7 @@ let editingIncidentId = null;
 let editingServiceId = null;
 let incidentLights = false;
 let selectedCalendarYear = new Date().getFullYear();
+let serviceSearchTerm = '';
 
 const byId = (id) => document.getElementById(id);
 
@@ -70,20 +71,34 @@ function render() {
 function renderServiceList() {
   const list = byId('service-list');
   list.innerHTML = '';
-  [...state.services].sort((a, b) => (b.startAt || '').localeCompare(a.startAt || '')).forEach((s) => {
-    const card = document.createElement('button');
-    card.className = 'card service-card';
-    const start = s.startAt ? formatDateTime(s.startAt) : '-';
-    const end = s.endAt ? formatDateTime(s.endAt) : '-';
-    const { icon, label } = shiftInfo(s);
-    card.innerHTML = `<h4 style="font-size:1.22rem">${icon} ${start} <span class="pill">${s.isSeg ? 'SEG' : label}</span></h4>
-      <div class="meta">📍 ${s.location}</div>
-      <div class="meta">🚑 ${s.vehicle}</div>
-      <div class="meta">📷 ${s.incidents.length} Einsätze · ⏱️ ${serviceHours(s)}</div>`;
-    card.onclick = () => selectService(s.id);
-    card.ondblclick = () => openServiceDialog(s.id);
-    list.append(card);
-  });
+  const q = serviceSearchTerm.trim().toLowerCase();
+  [...state.services]
+    .sort((a, b) => (b.startAt || '').localeCompare(a.startAt || ''))
+    .filter((s) => {
+      if (!q) return true;
+      const haystack = [
+        formatDateTime(s.startAt || ''),
+        formatDateTime(s.endAt || ''),
+        s.vehicle || '',
+        s.location || '',
+        s.note || '',
+        ...(s.colleagues || [])
+      ].join(' ').toLowerCase();
+      return haystack.includes(q);
+    })
+    .forEach((s) => {
+      const card = document.createElement('button');
+      card.className = 'card service-card';
+      const start = s.startAt ? formatDateTime(s.startAt) : '-';
+      const { icon, label } = shiftInfo(s);
+      card.innerHTML = `<h4 style="font-size:1.22rem">${icon} ${start} <span class="pill">${s.isSeg ? 'SEG' : label}</span></h4>
+        <div class="meta">📍 ${s.location}</div>
+        <div class="meta">🚑 ${s.vehicle}</div>
+        <div class="meta">📷 ${s.incidents.length} Einsätze · ⏱️ ${serviceHours(s)}</div>`;
+      card.onclick = () => selectService(s.id);
+      card.ondblclick = () => openServiceDialog(s.id);
+      list.append(card);
+    });
 }
 
 function shiftInfo(service) {
@@ -178,17 +193,23 @@ function renderServiceDetail() {
   byId('btn-new-incident').disabled = !s;
   if (byId('btn-edit-service')) byId('btn-edit-service').disabled = !s;
   byId('service-title').textContent = s ? `${s.vehicle} · ${s.location}` : 'Dienst auswählen';
-  byId('service-meta').textContent = s ? `${formatDateTime(s.startAt)} bis ${formatDateTime(s.endAt)} · Kollegen: ${(s.colleagues || []).join(', ') || '-'}` : '';
+  byId('service-meta').innerHTML = s
+    ? `<div><strong>🕒</strong> ${formatDateTime(s.startAt)} bis ${formatDateTime(s.endAt)}</div>
+      <div><strong>📍</strong> ${s.location || '-'}</div>
+      <div><strong>🚑</strong> ${s.vehicle || '-'}</div>
+      <div><strong>👥</strong> ${(s.colleagues || []).join(', ') || '-'}</div>`
+    : '<div class="meta">Kein Dienst ausgewählt.</div>';
   const list = byId('incident-list');
   list.innerHTML = '';
   if (!s) return;
   s.incidents.forEach((i) => {
     const card = document.createElement('article');
     card.className = 'card';
-    const pzc = i.pzc?.diag ? `${i.pzc.diag}-${i.pzc.age || '--'}-${i.pzc.prio || '-'}` : '-';
-    const timeStrip = timeFields.map((f) => `<span class="pill ${i.times?.[f] ? 'blue' : ''}">${f}${i.times?.[f] ? ` ${i.times[f]}` : ''}</span>`).join(' ');
-    const no = i.incidentNumber ? `#${i.incidentNumber} · ` : '';
-    card.innerHTML = `<h4>${no}${i.alarmCode}</h4><div class="meta">${i.lights ? '🚨 Einsatz' : '🧰 Nicht-Einsatz'} · ⏱️ ${calcDuration(i.times)} · PZC ${pzc}</div><div>${timeStrip}</div>`;
+    const pzc = i.pzc?.diag ? `${i.pzc.diag} - ${pzcDiagnosis(i.pzc.diag)} - ${i.pzc.prio || '-'}` : '-';
+    const note = i.note ? `📝 ${i.note.slice(0, 90)}${i.note.length > 90 ? '…' : ''}` : '';
+    card.innerHTML = `<div class="incident-item-head"><img src="${i.lights ? 'lights_on.svg' : 'lights_off.svg'}" alt=""><div class="incident-item-title">${i.alarmCode}</div></div>
+      <div class="meta">${i.incidentNumber || '-'} · ${pzc} · ⏱️ ${calcDuration(i.times)}</div>
+      ${note ? `<div class="meta">${note}</div>` : ''}`;
     card.onclick = () => openIncidentDialog(i.id);
     list.append(card);
   });
@@ -212,9 +233,13 @@ function renderStats() {
   renderPie('vehicle', services.map((s) => s.vehicle || 'Unbekannt'));
   renderPie('station', services.map((s) => s.location || 'Unbekannt'));
   renderPie('colleague', services.flatMap((s) => s.colleagues || []).filter(Boolean));
-  renderHeatmap(services);
+  renderHeatmap(state.services);
   byId('top-alarm-list').innerHTML = Object.entries(byAlarm).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k}<strong style=\"float:right\">${v}</strong></div>`).join('');
   byId('top-pzc-list').innerHTML = Object.entries(byPzc).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k} · ${pzcDiagnosis(k)}<strong style=\"float:right\">${v}</strong></div>`).join('');
+}
+
+function pzcDiagnosis(code) {
+  return state.pzcCodes.find((p) => p.code === code)?.diagnosis || 'Unbekannt';
 }
 
 function getFilteredData() {
@@ -388,20 +413,13 @@ function collectHistorySorted(key) {
 
 function addColleagueField(value = '', targetId = 'colleague-wrap') {
   const wrap = byId(targetId);
+  const suggestId = `colleague-suggest-${uid()}`;
   const row = document.createElement('div');
   row.className = 'incident-no-wrap';
-  row.innerHTML = `<input class="colleague-input" value="${value}" placeholder="Kollege/Kollegin"><button type="button" class="btn">−</button><div class="suggest-list"></div>`;
+  row.innerHTML = `<div class="dropdown-wrap"><input class="colleague-input" value="${value}" placeholder="Kollege/Kollegin" autocomplete="off"><div id="${suggestId}" class="dropdown-list"></div></div><button type="button" class="btn">−</button>`;
   row.querySelector('button').onclick = () => row.remove();
   const input = row.querySelector('input');
-  const suggestBox = row.querySelector('.suggest-list');
-  const pool = collectHistoryValues('colleagues');
-  const redraw = () => {
-    const q = input.value.toLowerCase().trim();
-    suggestBox.innerHTML = pool.filter((x) => x.toLowerCase().includes(q)).slice(0, 6).map((x) => `<button type="button" class="suggest">${x}</button>`).join('');
-    [...suggestBox.querySelectorAll('.suggest')].forEach((b) => b.onclick = () => { input.value = b.textContent; redraw(); });
-  };
-  input.addEventListener('input', redraw);
-  redraw();
+  mountSuggestions(input, suggestId, collectHistorySorted('colleagues'), 8);
   wrap.append(row);
 }
 
@@ -468,8 +486,8 @@ function setLightButton() {
   const b = byId('btn-lights-toggle');
   b.classList.toggle('off', !incidentLights);
   b.innerHTML = incidentLights
-    ? '<img class=\"light-icon\" src=\"lights_on.svg\" alt=\"Blaulicht an\"><small>Blaulicht</small>'
-    : '<img class=\"light-icon\" src=\"lights_off.svg\" alt=\"Blaulicht aus\"><small>Kein Einsatz</small>';
+    ? '<img class=\"light-icon\" src=\"lights_on.svg\" alt=\"Blaulicht an\">'
+    : '<img class=\"light-icon\" src=\"lights_off.svg\" alt=\"Blaulicht aus\">';
 }
 
 function shouldAutoLights(code) {
@@ -505,11 +523,13 @@ function buildTimeButtons(targetId = 'time-grid') {
     btn.dataset.key = name;
     btn.innerHTML = `<strong>${name}</strong><input type="text" inputmode="numeric" maxlength="5">`;
     const input = btn.querySelector('input');
+    let suppressClearUntil = 0;
     const writeTime = (value) => {
       if (!input) return;
       btn.dataset.time = value;
       btn.classList.add('on');
       input.value = value;
+      suppressClearUntil = Date.now() + 450;
     };
     let longPressTimer = null;
     let consumed = false;
@@ -533,6 +553,7 @@ function buildTimeButtons(targetId = 'time-grid') {
     btn.addEventListener('click', (e) => {
       if (!btn.classList.contains('on')) return;
       if (e.target === input) return;
+      if (Date.now() < suppressClearUntil) return;
       btn.dataset.time = '';
       btn.classList.remove('on');
       if (input) input.value = '';
@@ -581,6 +602,7 @@ if (byId('btn-edit-service')) byId('btn-edit-service').onclick = () => selectedS
 byId('btn-new-seg').onclick = () => {
   const f = byId('seg-form');
   f.reset();
+  f.date.value = new Date().toISOString().slice(0, 10);
   byId('seg-colleague-wrap').innerHTML = '';
   addColleagueField('', 'seg-colleague-wrap');
   buildTimeButtons('seg-time-grid');
@@ -691,6 +713,30 @@ byId('incident-form').pzcAge.addEventListener('input', (e) => {
 byId('incident-form').incidentSuffix.addEventListener('input', (e) => {
   e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
 });
+if (byId('service-search')) byId('service-search').addEventListener('input', (e) => {
+  serviceSearchTerm = e.target.value || '';
+  renderServiceList();
+});
+if (byId('pzc-search')) {
+  const pzcInput = byId('pzc-search');
+  mountSuggestions(
+    pzcInput,
+    'pzc-search-suggest',
+    state.pzcCodes.map((p) => `${p.code} - ${p.diagnosis}`),
+    10
+  );
+  byId('pzc-search-suggest').addEventListener('click', (e) => {
+    const btn = e.target.closest('.dropdown-item');
+    if (!btn) return;
+    const code = btn.textContent.split(' - ')[0]?.trim();
+    if (!/^\d{3}$/.test(code)) return;
+    byId('incident-form').pzcDiag.value = code;
+    byId('incident-form').pzcAge.focus();
+    pzcInput.value = '';
+    byId('pzc-search-suggest').classList.remove('open');
+    updatePzcPreview();
+  });
+}
 
 function exportData() {
   const exportPayload = toCompatExport(state);
