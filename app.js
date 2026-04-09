@@ -159,8 +159,6 @@ function renderStats() {
   const { services, incidents } = getFilteredData();
   const byAlarm = incidents.reduce((a, i) => ((a[i.alarmCode] = (a[i.alarmCode] || 0) + 1), a), {});
   const byPzc = incidents.filter((i) => i.pzc?.diag).reduce((a, i) => ((a[i.pzc.diag] = (a[i.pzc.diag] || 0) + 1), a), {});
-  const topAlarm = Object.entries(byAlarm).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(', ') || '-';
-  const topPzc = Object.entries(byPzc).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k} (${v})`).join(', ') || '-';
   const shiftOnly = services.filter((s) => !s.isSeg);
   const avgByShift = shiftOnly.length ? (incidents.length / shiftOnly.length).toFixed(1) : '0.0';
   const durationHours = services.reduce((acc, s) => acc + (Number(serviceHours(s).replace('h', '')) || 0), 0).toFixed(1);
@@ -170,9 +168,7 @@ function renderStats() {
     <div class="card"><h4>⚡ SEG Einsätze</h4><strong>${services.filter((s) => s.isSeg).length}</strong></div>
     <div class="card"><h4>⏱️ Dienststunden</h4><strong>${durationHours}h</strong></div>
     <div class="card"><h4>📈 Ø Einsätze / Dienst</h4><strong>${avgByShift}</strong></div>
-    <div class="card"><h4>🚨 Blaulichtquote</h4><strong>${incidents.length ? Math.round(100 * blueCount / incidents.length) : 0}%</strong><div class="meta">${blueCount}/${incidents.length}</div></div>
-    <div class="card"><h4>🏷️ Top Stichwörter</h4><div class="meta">${topAlarm}</div></div>
-    <div class="card"><h4>🧬 Top PZC Diagnose</h4><div class="meta">${topPzc}</div></div>`;
+    <div class="card"><h4>🚨 Blaulichtquote</h4><strong>${incidents.length ? Math.round(100 * blueCount / incidents.length) : 0}%</strong><div class="meta">${blueCount}/${incidents.length}</div></div>`;
   renderPie('vehicle', services.map((s) => s.vehicle || 'Unbekannt'));
   renderPie('station', services.map((s) => s.location || 'Unbekannt'));
   renderPie('colleague', services.flatMap((s) => s.colleagues || []).filter(Boolean));
@@ -205,7 +201,7 @@ function renderPie(prefix, values) {
     entries = [...entries, ['Anderes', other]];
   }
   const total = entries.reduce((a, [, v]) => a + v, 0) || 1;
-  const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#14b8a6'];
+  const colors = entries.map((_, idx) => `hsl(${(idx * 37) % 360} 78% 58%)`);
   let acc = 0;
   const grad = entries.map(([, v], idx) => {
     const start = (acc / total) * 360;
@@ -228,11 +224,15 @@ function renderHeatmap(incidents) {
   const box = byId('calendar-heatmap');
   if (!box) return;
   const years = [...new Set(incidents.map((i) => (i.createdAt || '').slice(0, 4)).filter(Boolean).map(Number))].sort((a, b) => a - b);
-  const yearSelect = byId('calendar-year');
-  if (yearSelect) {
-    const limited = years.slice(-5);
-    if (limited.length && !limited.includes(selectedCalendarYear)) selectedCalendarYear = limited.at(-1);
-    yearSelect.innerHTML = limited.map((y) => `<option value="${y}" ${y === selectedCalendarYear ? 'selected' : ''}>${y}</option>`).join('');
+  const yearList = byId('calendar-year-list');
+  const limited = years.slice(-5);
+  if (limited.length && !limited.includes(selectedCalendarYear)) selectedCalendarYear = limited.at(-1);
+  if (yearList) {
+    yearList.innerHTML = limited.map((y) => `<button type="button" class="year-btn ${y === selectedCalendarYear ? 'active' : ''}" data-year="${y}">${y}</button>`).join('');
+    [...yearList.querySelectorAll('.year-btn')].forEach((btn) => btn.onclick = () => {
+      selectedCalendarYear = Number(btn.dataset.year);
+      renderStats();
+    });
   }
   const counts = incidents.reduce((a, i) => {
     const d = (i.createdAt || '').slice(0, 10);
@@ -242,6 +242,9 @@ function renderHeatmap(incidents) {
     return a;
   }, {});
   const days = [];
+  byId('calendar-months').innerHTML = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
+    .map((m) => `<span>${m}</span>`).join('');
+  byId('calendar-days-label').innerHTML = ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'].map((d) => `<span>${d}</span>`).join('');
   const start = new Date(selectedCalendarYear, 0, 1);
   const end = new Date(selectedCalendarYear + 1, 0, 1);
   const totalDays = Math.round((end - start) / 86400000);
@@ -252,7 +255,8 @@ function renderHeatmap(incidents) {
     const c = counts[key] || 0;
     const lv = c === 0 ? 0 : c <= 2 ? 1 : c <= 4 ? 2 : c <= 6 ? 3 : c <= 8 ? 4 : c <= 10 ? 5 : 6;
     const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-    days.push(`<span class="heat lv${lv}" title="${dayLabel} · ${c} Fahrten"></span>`);
+    const title = c ? `${dayLabel} · ${c} Fahrten` : dayLabel;
+    days.push(`<span class="heat lv${lv}" title="${title}"></span>`);
   }
   box.innerHTML = days.join('');
 }
@@ -468,7 +472,6 @@ if (byId('btn-add-seg-colleague')) byId('btn-add-seg-colleague').onclick = () =>
 byId('btn-lights-toggle').onclick = () => { incidentLights = !incidentLights; setLightButton(); };
 if (byId('stats-from')) byId('stats-from').onchange = renderStats;
 if (byId('stats-to')) byId('stats-to').onchange = renderStats;
-if (byId('calendar-year')) byId('calendar-year').onchange = (e) => { selectedCalendarYear = Number(e.target.value); renderStats(); };
 if (byId('settings-export')) byId('settings-export').onclick = exportData;
 if (byId('settings-import')) byId('settings-import').onchange = importData;
 

@@ -52,10 +52,12 @@
 
     <section id="tab-statistik" class="tab-panel">
       <div class="panel">
-        <h2>Statistik</h2>
-        <div class="two-col">
-          <label>Von<input id="stats-from" type="date"></label>
-          <label>Bis<input id="stats-to" type="date"></label>
+        <div class="panel-head">
+          <h2>Statistik</h2>
+          <div class="filter-stack">
+            <label>Von<input id="stats-from" type="date"></label>
+            <label>Bis<input id="stats-to" type="date"></label>
+          </div>
         </div>
         <div id="stats" class="facts-grid"></div>
         <div class="charts-grid">
@@ -86,16 +88,25 @@
         <div class="card">
           <div class="panel-head">
             <h4>📅 Einsatzkalender</h4>
-            <select id="calendar-year"></select>
+            <div id="calendar-year-list" class="year-list"></div>
           </div>
-          <div id="calendar-heatmap" class="heatmap"></div>
-          <div class="legend">
-            <div><span class="dot lv1"></span>1-2 Fahrten</div>
-            <div><span class="dot lv2"></span>3-4 Fahrten</div>
-            <div><span class="dot lv3"></span>5-6 Fahrten</div>
-            <div><span class="dot lv4"></span>7-8 Fahrten</div>
-            <div><span class="dot lv5"></span>9-10 Fahrten</div>
-            <div><span class="dot lv6"></span>&gt;10 Fahrten</div>
+          <div class="calendar-wrap">
+            <div>
+              <div id="calendar-months" class="month-row"></div>
+              <div class="calendar-body">
+                <div id="calendar-days-label" class="day-col"></div>
+                <div id="calendar-heatmap" class="heatmap"></div>
+              </div>
+            </div>
+            <div class="legend">
+              <div><span class="dot lv0"></span>0 Fahrten</div>
+              <div><span class="dot lv1"></span>1-2 Fahrten</div>
+              <div><span class="dot lv2"></span>3-4 Fahrten</div>
+              <div><span class="dot lv3"></span>5-6 Fahrten</div>
+              <div><span class="dot lv4"></span>7-8 Fahrten</div>
+              <div><span class="dot lv5"></span>9-10 Fahrten</div>
+              <div><span class="dot lv6"></span>&gt;10 Fahrten</div>
+            </div>
           </div>
         </div>
       </div>
