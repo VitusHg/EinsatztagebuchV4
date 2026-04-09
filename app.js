@@ -172,7 +172,7 @@ function renderStats() {
   renderPie('vehicle', services.map((s) => s.vehicle || 'Unbekannt'));
   renderPie('station', services.map((s) => s.location || 'Unbekannt'));
   renderPie('colleague', services.flatMap((s) => s.colleagues || []).filter(Boolean));
-  renderHeatmap(incidents);
+  renderHeatmap(services);
   byId('top-alarm-list').innerHTML = Object.entries(byAlarm).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k}<strong style=\"float:right\">${v}</strong></div>`).join('');
   byId('top-pzc-list').innerHTML = Object.entries(byPzc).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k} · ${pzcDiagnosis(k)}<strong style=\"float:right\">${v}</strong></div>`).join('');
 }
@@ -220,10 +220,10 @@ function renderPie(prefix, values) {
   );
 }
 
-function renderHeatmap(incidents) {
+function renderHeatmap(services) {
   const box = byId('calendar-heatmap');
   if (!box) return;
-  const years = [...new Set(incidents.map((i) => (i.createdAt || '').slice(0, 4)).filter(Boolean).map(Number))].sort((a, b) => a - b);
+  const years = [...new Set(services.map((s) => (s.startAt || '').slice(0, 4)).filter(Boolean).map(Number))].sort((a, b) => a - b);
   const yearList = byId('calendar-year-list');
   const limited = years.slice(-5);
   if (limited.length && !limited.includes(selectedCalendarYear)) selectedCalendarYear = limited.at(-1);
@@ -234,11 +234,13 @@ function renderHeatmap(incidents) {
       renderStats();
     });
   }
-  const counts = incidents.reduce((a, i) => {
-    const d = (i.createdAt || '').slice(0, 10);
+  const dayStats = services.reduce((a, s) => {
+    const d = (s.startAt || '').slice(0, 10);
     if (!d) return a;
     if (Number(d.slice(0, 4)) !== selectedCalendarYear) return a;
-    a[d] = (a[d] || 0) + 1;
+    if (!a[d]) a[d] = { services: 0, incidents: 0 };
+    a[d].services += 1;
+    a[d].incidents += (s.incidents || []).length;
     return a;
   }, {});
   const days = [];
@@ -252,11 +254,24 @@ function renderHeatmap(incidents) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     const key = d.toISOString().slice(0, 10);
-    const c = counts[key] || 0;
-    const lv = c === 0 ? 0 : c <= 2 ? 1 : c <= 4 ? 2 : c <= 6 ? 3 : c <= 8 ? 4 : c <= 10 ? 5 : 6;
+    const stats = dayStats[key] || { services: 0, incidents: 0 };
+    const c = stats.incidents;
+    const hasService = stats.services > 0;
+    let lv = 'lv0';
+    if (hasService && c === 0) lv = 'lv-service';
+    else if (c > 0 && c <= 2) lv = 'lv1';
+    else if (c > 2 && c <= 4) lv = 'lv2';
+    else if (c > 4 && c <= 6) lv = 'lv3';
+    else if (c > 6 && c <= 8) lv = 'lv4';
+    else if (c > 8 && c <= 10) lv = 'lv5';
+    else if (c > 10) lv = 'lv6';
     const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
-    const title = c ? `${dayLabel} · ${c} Fahrten` : dayLabel;
-    days.push(`<span class="heat lv${lv}" title="${title}"></span>`);
+    const title = c
+      ? `${dayLabel} · ${c} Fahrten`
+      : hasService
+        ? `${dayLabel} · Dienst ohne Fahrten`
+        : `${dayLabel} · Kein Dienst`;
+    days.push(`<span class="heat ${lv}" title="${title}"></span>`);
   }
   box.innerHTML = days.join('');
 }

@@ -62,27 +62,31 @@
         <div id="stats" class="facts-grid"></div>
         <div class="charts-grid">
           <div class="card chart-card">
-            <h4>🚑 Fahrzeuge</h4>
-            <div id="vehicle-pie" class="pie"></div>
-            <div id="vehicle-legend" class="legend"></div>
+            <h4>🏷️ Top Einsätze (Alarmcodes)</h4>
+            <div id="top-alarm-list" class="card-list compact-list"></div>
           </div>
           <div class="card chart-card">
-            <h4>📍 Dienststellen</h4>
-            <div id="station-pie" class="pie"></div>
-            <div id="station-legend" class="legend"></div>
+            <h4>🧬 Top PZC</h4>
+            <div id="top-pzc-list" class="card-list compact-list"></div>
           </div>
           <div class="card chart-card">
-            <h4>👥 Kolleg:innen</h4>
+            <h4>👥 Top Kolleg:innen</h4>
             <div id="colleague-pie" class="pie"></div>
             <div id="colleague-legend" class="legend"></div>
           </div>
           <div class="card chart-card">
-            <h4>🏷️ Alarmcodes</h4>
-            <div id="top-alarm-list" class="card-list compact-list"></div>
+            <h4>🚑 Top Auto</h4>
+            <div id="vehicle-pie" class="pie"></div>
+            <div id="vehicle-legend" class="legend"></div>
           </div>
           <div class="card chart-card">
-            <h4>🧬 PZC</h4>
-            <div id="top-pzc-list" class="card-list compact-list"></div>
+            <h4>📍 Top Dienststelle</h4>
+            <div id="station-pie" class="pie"></div>
+            <div id="station-legend" class="legend"></div>
+          </div>
+          <div class="card chart-card placeholder-card">
+            <h4>➕ Platzhalter</h4>
+            <div class="meta">Freier Bereich für zukünftige Statistik-Kachel.</div>
           </div>
         </div>
         <div class="card">
@@ -99,7 +103,8 @@
               </div>
             </div>
             <div class="legend">
-              <div><span class="dot lv0"></span>0 Fahrten</div>
+              <div><span class="dot lv0"></span>Kein Dienst</div>
+              <div><span class="dot lv-service"></span>Dienst ohne Fahrten</div>
               <div><span class="dot lv1"></span>1-2 Fahrten</div>
               <div><span class="dot lv2"></span>3-4 Fahrten</div>
               <div><span class="dot lv3"></span>5-6 Fahrten</div>
