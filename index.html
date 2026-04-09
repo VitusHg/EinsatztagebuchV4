@@ -12,10 +12,6 @@
   <header class="topbar">
     <div class="brand">☰ Einsatztagebuch</div>
     <div class="clock" id="clock"></div>
-    <div class="header-actions">
-      <button id="btn-export" class="btn">Export</button>
-      <label class="btn">Import<input id="import-input" type="file" accept="application/json" hidden></label>
-    </div>
   </header>
 
   <div class="app-shell">
@@ -72,6 +68,11 @@
             <div id="station-pie" class="pie"></div>
             <div id="station-legend" class="legend"></div>
           </div>
+          <div class="card">
+            <h4>👥 Kolleg:innen</h4>
+            <div id="colleague-pie" class="pie"></div>
+            <div id="colleague-legend" class="legend"></div>
+          </div>
         </div>
         <div class="card">
           <h4>📅 Einsatzkalender</h4>
@@ -81,7 +82,7 @@
     </section>
 
     <section id="tab-settings" class="tab-panel">
-      <div class="panel">
+      <div class="panel settings-scroll">
         <h2>Einstellungen</h2>
         <div class="two-col">
           <label>Zeitzone
@@ -151,6 +152,14 @@
         <button value="cancel" class="btn" formnovalidate>Abbrechen</button>
         <button value="default" class="btn primary">Speichern</button>
       </menu>
+    </form>
+  </dialog>
+
+  <dialog id="ranking-dialog">
+    <form method="dialog" class="form">
+      <h3 id="ranking-title">Ranking</h3>
+      <div id="ranking-list" class="card-list"></div>
+      <menu><button class="btn primary">Schließen</button></menu>
     </form>
   </dialog>
 

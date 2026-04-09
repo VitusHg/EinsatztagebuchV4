@@ -169,6 +169,7 @@ function renderStats() {
     <div class="card"><h4>🧬 Top PZC Diagnose</h4><div class="meta">${topPzc}</div></div>`;
   renderPie('vehicle', services.map((s) => s.vehicle || 'Unbekannt'));
   renderPie('station', services.map((s) => s.location || 'Unbekannt'));
+  renderPie('colleague', services.flatMap((s) => s.colleagues || []).filter(Boolean));
   renderHeatmap(incidents);
 }
 
@@ -204,6 +205,10 @@ function renderPie(prefix, values) {
   if (!pie || !legend) return;
   pie.style.background = `conic-gradient(${grad || '#334155 0deg 360deg'})`;
   legend.innerHTML = entries.map(([k, v], idx) => `<div><span class="dot" style="background:${colors[idx]}"></span>${k} (${v})</div>`).join('');
+  pie.onclick = () => openRankingDialog(
+    prefix === 'vehicle' ? 'Fahrzeugranking' : prefix === 'station' ? 'Dienststellenranking' : 'Kollegenranking',
+    Object.entries(map).sort((a, b) => b[1] - a[1])
+  );
 }
 
 function renderHeatmap(incidents) {
@@ -222,10 +227,16 @@ function renderHeatmap(incidents) {
     d.setDate(start.getDate() + i);
     const key = d.toISOString().slice(0, 10);
     const c = counts[key] || 0;
-    const lv = c === 0 ? 0 : c < 2 ? 1 : c < 4 ? 2 : 3;
+    const lv = c === 0 ? 0 : c < 2 ? 1 : c < 4 ? 2 : c < 7 ? 3 : c < 10 ? 4 : 5;
     days.push(`<span class="heat lv${lv}" title="${key}: ${c}"></span>`);
   }
   box.innerHTML = days.join('');
+}
+
+function openRankingDialog(title, entries) {
+  byId('ranking-title').textContent = title;
+  byId('ranking-list').innerHTML = entries.map(([name, count], idx) => `<div class="card">${idx + 1}. ${name}<strong style="float:right">${count}</strong></div>`).join('');
+  byId('ranking-dialog').showModal();
 }
 
 function renderCodeLists() {
@@ -414,11 +425,8 @@ if (byId('btn-add-seg-colleague')) byId('btn-add-seg-colleague').onclick = () =>
 byId('btn-lights-toggle').onclick = () => { incidentLights = !incidentLights; setLightButton(); };
 if (byId('stats-from')) byId('stats-from').onchange = renderStats;
 if (byId('stats-to')) byId('stats-to').onchange = renderStats;
-if (byId('settings-export')) byId('settings-export').onclick = () => byId('btn-export').click();
-if (byId('settings-import')) byId('settings-import').onchange = (e) => {
-  byId('import-input').files = e.target.files;
-  byId('import-input').dispatchEvent(new Event('change'));
-};
+if (byId('settings-export')) byId('settings-export').onclick = exportData;
+if (byId('settings-import')) byId('settings-import').onchange = importData;
 
 byId('service-form').onsubmit = (e) => {
   e.preventDefault();
@@ -504,22 +512,22 @@ byId('incident-form').alarmCode.addEventListener('input', (e) => {
 });
 ['pzcDiag', 'pzcAge', 'pzcPrio'].forEach((k) => byId('incident-form')[k].addEventListener('input', updatePzcPreview));
 
-byId('btn-export').onclick = () => {
+function exportData() {
   const exportPayload = toCompatExport(state);
   const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `einsatztagebuch-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
-};
+}
 
-byId('import-input').onchange = async (e) => {
+async function importData(e) {
   const file = e.target.files[0];
   if (!file) return;
   const imported = JSON.parse(await file.text());
   state = normalizeState(fromCompatibleImport(imported));
   saveState();
-};
+}
 
 function toCompatExport(source) {
   return {
@@ -598,6 +606,7 @@ if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
 setupDialogDismiss(byId('service-dialog'));
 setupDialogDismiss(byId('incident-dialog'));
 setupDialogDismiss(byId('seg-dialog'));
+setupDialogDismiss(byId('ranking-dialog'));
 
 function setupDialogDismiss(dialog) {
   dialog.addEventListener('click', (e) => {
