@@ -211,31 +211,27 @@
             <div id="alarm-suggest" class="dropdown-list"></div>
           </div>
         </label>
-        <label>Einsatznr.
-          <input name="incidentNumber" placeholder="optional">
-        </label>
       </div>
       <div>
-        <div class="pzc-row">
-          <div>
-            <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
-            <small>Diagnose</small>
-          </div>
-          <div>
-            <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
-            <small>Alter</small>
-          </div>
-          <div>
-            <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
-            <small>Prio</small>
-          </div>
+        <div class="pzc-row pzc-composite">
+          <input name="pzcDiag" maxlength="3" inputmode="numeric" placeholder="123">
+          <input name="pzcAge" maxlength="2" inputmode="numeric" placeholder="45">
+          <input name="pzcPrio" maxlength="1" inputmode="numeric" placeholder="1">
         </div>
-        <p id="pzc-preview" class="meta">Aufgelöst: -</p>
+        <p id="pzc-preview" class="meta">-</p>
       </div>
 
       <label>Kommentar / Notiz
         <textarea name="note" rows="4" placeholder="Anmerkungen / Kommentare"></textarea>
       </label>
+      <div class="incident-number-row">
+        <label>Einsatznr.
+          <div class="incident-no-wrap">
+            <span id="incident-year-prefix"></span>
+            <input name="incidentSuffix" maxlength="6" inputmode="numeric" placeholder="000001">
+          </div>
+        </label>
+      </div>
 
       <menu>
         <button value="cancel" class="btn" formnovalidate>Abbrechen</button>

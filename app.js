@@ -433,6 +433,8 @@ function openIncidentDialog(incidentId = null) {
   editingIncidentId = incidentId;
   const form = byId('incident-form');
   form.reset();
+  const year = String(new Date().getFullYear());
+  byId('incident-year-prefix').textContent = year;
   buildTimeButtons();
   mountSuggestions(form.alarmCode, 'alarm-suggest', state.alarmCodes.map((a) => a.code), 10);
   incidentLights = false;
@@ -440,7 +442,7 @@ function openIncidentDialog(incidentId = null) {
 
   if (incidentId) {
     const i = serviceById().incidents.find((x) => x.id === incidentId);
-    form.incidentNumber.value = i.incidentNumber || '';
+    form.incidentSuffix.value = (i.incidentNumber || '').startsWith(year) ? i.incidentNumber.slice(4, 10) : '';
     form.alarmCode.value = i.alarmCode;
     incidentLights = !!i.lights;
     form.note.value = i.note || '';
@@ -501,7 +503,7 @@ function buildTimeButtons(targetId = 'time-grid') {
     const btn = document.createElement('div');
     btn.className = 'status-btn';
     btn.dataset.key = name;
-    btn.innerHTML = `<strong>${name}</strong><input type="text" inputmode="numeric" placeholder="HHMM / HH:MM" maxlength="5">`;
+    btn.innerHTML = `<strong>${name}</strong><input type="text" inputmode="numeric" maxlength="5">`;
     const input = btn.querySelector('input');
     const writeTime = (value) => {
       if (!input) return;
@@ -527,6 +529,13 @@ function buildTimeButtons(targetId = 'time-grid') {
       const now = new Date().toTimeString().slice(0, 5);
       writeTime(now);
       consumed = true;
+    });
+    btn.addEventListener('click', (e) => {
+      if (!btn.classList.contains('on')) return;
+      if (e.target === input) return;
+      btn.dataset.time = '';
+      btn.classList.remove('on');
+      if (input) input.value = '';
     });
     input?.addEventListener('focus', () => { consumed = false; });
     input?.addEventListener('input', () => {
@@ -564,7 +573,7 @@ function updatePzcPreview() {
       : prio === '3'
         ? 'Voraussichtl. Ambulante Behandlung'
         : '-';
-  byId('pzc-preview').textContent = `Aufgelöst: ${txt} - ${age || '-'} - ${prioText}`;
+  byId('pzc-preview').textContent = `${txt} - ${age || '-'} - ${prioText}`;
 }
 
 byId('btn-new-service').onclick = openServiceDialog;
@@ -616,10 +625,13 @@ byId('incident-form').onsubmit = (e) => {
   const f = e.target;
   const alarmCode = f.alarmCode.value.trim();
   if (!alarmCode) return alert('Bitte mindestens ein Stichwort eingeben.');
+  const suffix = f.incidentSuffix.value.replace(/\D/g, '').slice(0, 6);
+  if (f.incidentSuffix.value && suffix.length !== 6) return alert('Einsatznummer: bitte genau 6 Ziffern eingeben.');
+  const incidentNumber = suffix.length === 6 ? `${new Date().getFullYear()}${suffix}` : '';
   const times = Object.fromEntries([...byId('time-grid').querySelectorAll('.status-btn')].filter((b) => b.dataset.time).map((b) => [b.dataset.key, b.dataset.time]));
   const payload = {
     id: editingIncidentId || uid(),
-    incidentNumber: f.incidentNumber.value.trim(),
+    incidentNumber,
     alarmCode,
     lights: shouldAutoLights(alarmCode) ? true : incidentLights,
     times,
@@ -675,6 +687,9 @@ byId('incident-form').pzcDiag.addEventListener('input', (e) => {
 });
 byId('incident-form').pzcAge.addEventListener('input', (e) => {
   if (e.target.value.replace(/\D/g, '').slice(0, 2).length >= 2) byId('incident-form').pzcPrio.focus();
+});
+byId('incident-form').incidentSuffix.addEventListener('input', (e) => {
+  e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
 });
 
 function exportData() {
