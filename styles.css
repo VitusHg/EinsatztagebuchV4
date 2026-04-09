@@ -25,6 +25,7 @@ main { overflow: hidden; height: 100%; }
 .tab.active { background: var(--orange); color: #2b1d00; font-weight: 700; }
 .tab-panel { display: none; padding: .8rem; height: 100%; }
 .tab-panel.active { display: block; overflow: auto; }
+.tab-panel.active { display: block; }
 .layout { display: grid; grid-template-columns: 520px 1fr; gap: .8rem; height: 100%; }
 .panel { background: var(--panel); border-radius: 1rem; padding: .75rem; min-height: calc(100dvh - 150px); display: flex; flex-direction: column; }
 .panel-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
@@ -32,6 +33,7 @@ main { overflow: hidden; height: 100%; }
 .card { background: var(--card); border-radius: .8rem; padding: .65rem; border: 1px solid #25385d; color: var(--text); }
 .card h4 { margin: 0 0 .3rem; }
 .service-card { text-align: left; padding: 1rem; min-height: 128px; }
+.service-card { text-align: left; padding: .9rem; min-height: 108px; }
 .btn { border: 1px solid #31456e; background: #1d2c49; color: white; border-radius: .7rem; padding: .5rem .75rem; }
 .btn.primary { background: var(--orange); color: #2b1d00; border-color: transparent; font-weight: 700; }
 .meta { color: var(--muted); font-size: .9rem; }
