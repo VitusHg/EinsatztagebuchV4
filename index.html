@@ -57,36 +57,45 @@
           <label>Von<input id="stats-from" type="date"></label>
           <label>Bis<input id="stats-to" type="date"></label>
         </div>
-        <div id="stats" class="stats-grid"></div>
-        <div class="two-col">
-          <div class="card">
+        <div id="stats" class="facts-grid"></div>
+        <div class="charts-grid">
+          <div class="card chart-card">
             <h4>🚑 Fahrzeuge</h4>
             <div id="vehicle-pie" class="pie"></div>
             <div id="vehicle-legend" class="legend"></div>
           </div>
-          <div class="card">
+          <div class="card chart-card">
             <h4>📍 Dienststellen</h4>
             <div id="station-pie" class="pie"></div>
             <div id="station-legend" class="legend"></div>
           </div>
-          <div class="card">
+          <div class="card chart-card">
             <h4>👥 Kolleg:innen</h4>
             <div id="colleague-pie" class="pie"></div>
             <div id="colleague-legend" class="legend"></div>
           </div>
-        </div>
-        <div class="card">
-          <h4>📅 Einsatzkalender</h4>
-          <div id="calendar-heatmap" class="heatmap"></div>
-        </div>
-        <div class="two-col">
-          <div class="card">
-            <h4>🏷️ Top Alarmcodes</h4>
+          <div class="card chart-card">
+            <h4>🏷️ Alarmcodes</h4>
             <div id="top-alarm-list" class="card-list compact-list"></div>
           </div>
-          <div class="card">
-            <h4>🧬 Top PZC</h4>
+          <div class="card chart-card">
+            <h4>🧬 PZC</h4>
             <div id="top-pzc-list" class="card-list compact-list"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="panel-head">
+            <h4>📅 Einsatzkalender</h4>
+            <select id="calendar-year"></select>
+          </div>
+          <div id="calendar-heatmap" class="heatmap"></div>
+          <div class="legend">
+            <div><span class="dot lv1"></span>1-2 Fahrten</div>
+            <div><span class="dot lv2"></span>3-4 Fahrten</div>
+            <div><span class="dot lv3"></span>5-6 Fahrten</div>
+            <div><span class="dot lv4"></span>7-8 Fahrten</div>
+            <div><span class="dot lv5"></span>9-10 Fahrten</div>
+            <div><span class="dot lv6"></span>&gt;10 Fahrten</div>
           </div>
         </div>
       </div>

@@ -67,19 +67,22 @@ menu { display: flex; justify-content: flex-end; gap: .5rem; margin: 0; padding:
 .suggest { border: 1px solid #31456e; border-radius: 999px; background: #1d2c49; color: white; padding: .15rem .55rem; font-size: .8rem; cursor: pointer; }
 .pill { padding: .2rem .45rem; border-radius: 999px; background: #1d2c49; font-size: .8rem; }
 .pill.blue { background: var(--blue); }
-.stats-grid { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.facts-grid { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+.charts-grid { display: grid; gap: .6rem; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin-top: .6rem; }
+.chart-card { min-height: 310px; display: flex; flex-direction: column; }
 .compact-list { max-height: 180px; overflow: auto; }
 .pie { width: 150px; aspect-ratio: 1; border-radius: 999px; margin: .25rem auto .5rem; background: conic-gradient(#334155 0deg 360deg); }
 .pie { cursor: pointer; }
 .legend { display: grid; gap: .25rem; font-size: .86rem; color: var(--muted); }
-.dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 999px; margin-right: .45rem; vertical-align: middle; }
+.dot { display: inline-block; width: .7rem; height: .7rem; border-radius: 999px; margin-right: .45rem; vertical-align: middle; background: #64748b; }
 .heatmap { display: grid; grid-template-columns: repeat(53, 10px); gap: 3px; overflow: auto; padding: .35rem 0; }
 .heat { width: 10px; height: 10px; border-radius: 2px; background: #374151; }
-.heat.lv1 { background: #14532d; }
-.heat.lv2 { background: #16a34a; }
-.heat.lv3 { background: #4ade80; }
-.heat.lv4 { background: #86efac; }
-.heat.lv5 { background: #bbf7d0; }
+.heat.lv1, .dot.lv1 { background: #bbf7d0; }
+.heat.lv2, .dot.lv2 { background: #4ade80; }
+.heat.lv3, .dot.lv3 { background: #22c55e; }
+.heat.lv4, .dot.lv4 { background: #facc15; }
+.heat.lv5, .dot.lv5 { background: #fb923c; }
+.heat.lv6, .dot.lv6 { background: #ef4444; }
 .expander { border: 1px solid #31456e; border-radius: .7rem; padding: .45rem .55rem; background: #162845; }
 .expander summary { cursor: pointer; font-weight: 600; }
 .expander[open] { background: #1d2c49; }

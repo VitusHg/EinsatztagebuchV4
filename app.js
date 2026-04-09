@@ -14,6 +14,7 @@ let selectedServiceId = null;
 let editingIncidentId = null;
 let editingServiceId = null;
 let incidentLights = false;
+let selectedCalendarYear = new Date().getFullYear();
 
 const byId = (id) => document.getElementById(id);
 
@@ -176,8 +177,8 @@ function renderStats() {
   renderPie('station', services.map((s) => s.location || 'Unbekannt'));
   renderPie('colleague', services.flatMap((s) => s.colleagues || []).filter(Boolean));
   renderHeatmap(incidents);
-  byId('top-alarm-list').innerHTML = Object.entries(byAlarm).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k}<strong style=\"float:right\">${v}</strong></div>`).join('');
-  byId('top-pzc-list').innerHTML = Object.entries(byPzc).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k}<strong style=\"float:right\">${v}</strong></div>`).join('');
+  byId('top-alarm-list').innerHTML = Object.entries(byAlarm).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k}<strong style=\"float:right\">${v}</strong></div>`).join('');
+  byId('top-pzc-list').innerHTML = Object.entries(byPzc).sort((a,b)=>b[1]-a[1]).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k} · ${pzcDiagnosis(k)}<strong style=\"float:right\">${v}</strong></div>`).join('');
 }
 
 function getFilteredData() {
@@ -197,7 +198,12 @@ function getFilteredData() {
 
 function renderPie(prefix, values) {
   const map = values.reduce((a, x) => ((a[x] = (a[x] || 0) + 1), a), {});
-  const entries = Object.entries(map).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  const allEntries = Object.entries(map).sort((a, b) => b[1] - a[1]);
+  let entries = allEntries.slice(0, 10);
+  if (allEntries.length > 10) {
+    const other = allEntries.slice(10).reduce((a, [, v]) => a + v, 0);
+    entries = [...entries, ['Anderes', other]];
+  }
   const total = entries.reduce((a, [, v]) => a + v, 0) || 1;
   const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#14b8a6'];
   let acc = 0;
@@ -214,28 +220,39 @@ function renderPie(prefix, values) {
   legend.innerHTML = entries.map(([k, v], idx) => `<div><span class="dot" style="background:${colors[idx]}"></span>${k} (${v})</div>`).join('');
   pie.onclick = () => openRankingDialog(
     prefix === 'vehicle' ? 'Fahrzeugranking' : prefix === 'station' ? 'Dienststellenranking' : 'Kollegenranking',
-    Object.entries(map).sort((a, b) => b[1] - a[1])
+    allEntries
   );
 }
 
 function renderHeatmap(incidents) {
   const box = byId('calendar-heatmap');
   if (!box) return;
+  const years = [...new Set(incidents.map((i) => (i.createdAt || '').slice(0, 4)).filter(Boolean).map(Number))].sort((a, b) => a - b);
+  const yearSelect = byId('calendar-year');
+  if (yearSelect) {
+    const limited = years.slice(-5);
+    if (limited.length && !limited.includes(selectedCalendarYear)) selectedCalendarYear = limited.at(-1);
+    yearSelect.innerHTML = limited.map((y) => `<option value="${y}" ${y === selectedCalendarYear ? 'selected' : ''}>${y}</option>`).join('');
+  }
   const counts = incidents.reduce((a, i) => {
     const d = (i.createdAt || '').slice(0, 10);
     if (!d) return a;
+    if (Number(d.slice(0, 4)) !== selectedCalendarYear) return a;
     a[d] = (a[d] || 0) + 1;
     return a;
   }, {});
   const days = [];
-  const start = new Date(new Date().getFullYear(), 0, 1);
-  for (let i = 0; i < 365; i++) {
+  const start = new Date(selectedCalendarYear, 0, 1);
+  const end = new Date(selectedCalendarYear + 1, 0, 1);
+  const totalDays = Math.round((end - start) / 86400000);
+  for (let i = 0; i < totalDays; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     const key = d.toISOString().slice(0, 10);
     const c = counts[key] || 0;
-    const lv = c === 0 ? 0 : c < 2 ? 1 : c < 4 ? 2 : c < 7 ? 3 : c < 10 ? 4 : 5;
-    days.push(`<span class="heat lv${lv}" title="${key}: ${c}"></span>`);
+    const lv = c === 0 ? 0 : c <= 2 ? 1 : c <= 4 ? 2 : c <= 6 ? 3 : c <= 8 ? 4 : c <= 10 ? 5 : 6;
+    const dayLabel = d.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    days.push(`<span class="heat lv${lv}" title="${dayLabel} · ${c} Fahrten"></span>`);
   }
   box.innerHTML = days.join('');
 }
@@ -451,6 +468,7 @@ if (byId('btn-add-seg-colleague')) byId('btn-add-seg-colleague').onclick = () =>
 byId('btn-lights-toggle').onclick = () => { incidentLights = !incidentLights; setLightButton(); };
 if (byId('stats-from')) byId('stats-from').onchange = renderStats;
 if (byId('stats-to')) byId('stats-to').onchange = renderStats;
+if (byId('calendar-year')) byId('calendar-year').onchange = (e) => { selectedCalendarYear = Number(e.target.value); renderStats(); };
 if (byId('settings-export')) byId('settings-export').onclick = exportData;
 if (byId('settings-import')) byId('settings-import').onchange = importData;
 
