@@ -626,13 +626,13 @@ function toCompatExport(source) {
     exportedAt: new Date().toISOString(),
     user: { displayName: source.profile?.displayName || 'Privat' },
     shifts: source.services.map((s) => {
-      const start = s.startAt ? new Date(s.startAt) : null;
-      const end = s.endAt ? new Date(s.endAt) : null;
-      const duration = start && end ? Number(((end - start) / 3600000).toFixed(2)) : 0;
+      const start = s.startAt || null;
+      const end = s.endAt || null;
+      const duration = start && end ? Number((((new Date(end)) - (new Date(start))) / 3600000).toFixed(2)) : 0;
       return {
         shiftId: s.id,
-        startTime: start ? start.toISOString() : null,
-        endTime: end ? end.toISOString() : null,
+        startTime: start,
+        endTime: end,
         duration,
         location: s.location || '',
         resource: s.vehicle || '',
@@ -664,8 +664,8 @@ function fromCompatibleImport(payload) {
     profile: { displayName: payload?.user?.displayName || 'Privat' },
     services: payload.shifts.map((shift) => ({
       id: shift.shiftId || uid(),
-      startAt: shift.startTime ? new Date(shift.startTime).toISOString().slice(0, 16) : '',
-      endAt: shift.endTime ? new Date(shift.endTime).toISOString().slice(0, 16) : '',
+      startAt: shift.startTime || '',
+      endAt: shift.endTime || '',
       location: shift.location || '',
       vehicle: shift.resource || '',
       note: shift.note || '',
