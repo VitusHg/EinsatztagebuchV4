@@ -74,6 +74,10 @@ function renderServiceList() {
     card.className = 'card service-card';
     const start = s.startAt ? formatDateTime(s.startAt) : '-';
     const end = s.endAt ? formatDateTime(s.endAt) : '-';
+    const { icon, label } = shiftInfo(s);
+    card.innerHTML = `<h4 style="font-size:1.22rem">${icon} ${start} <span class="pill">${s.isSeg ? 'SEG' : label}</span></h4>
+      <div class="meta">📍 ${s.location}</div>
+      <div class="meta">🚑 ${s.vehicle}</div>
     const weekday = new Date(s.startAt).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
     card.innerHTML = `<h4>${s.isSeg ? '⚡' : '☀️'} ${start} <span class="pill">${s.isSeg ? 'SEG' : weekday}</span></h4>
       <div class="meta">📍 ${s.location}</div>
@@ -83,6 +87,15 @@ function renderServiceList() {
     card.ondblclick = () => openServiceDialog(s.id);
     list.append(card);
   });
+}
+
+function shiftInfo(service) {
+  if (service.isSeg) return { icon: '⚡', label: 'SEG' };
+  const dt = new Date(service.startAt);
+  const hour = dt.getHours();
+  const day = ['SO', 'MO', 'DI', 'MI', 'DO', 'FR', 'SA'][dt.getDay()];
+  const isDay = hour >= 5 && hour < 17;
+  return { icon: isDay ? '☀️' : '🌙', label: `${day}${isDay ? 'TA' : 'NA'}` };
 }
 
 function formatDateTime(value) {
@@ -171,6 +184,8 @@ function renderStats() {
   renderPie('station', services.map((s) => s.location || 'Unbekannt'));
   renderPie('colleague', services.flatMap((s) => s.colleagues || []).filter(Boolean));
   renderHeatmap(incidents);
+  byId('top-alarm-list').innerHTML = Object.entries(byAlarm).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k}<strong style=\"float:right\">${v}</strong></div>`).join('');
+  byId('top-pzc-list').innerHTML = Object.entries(byPzc).sort((a,b)=>b[1]-a[1]).slice(0,20).map(([k,v],i)=>`<div class=\"card\">${i+1}. ${k}<strong style=\"float:right\">${v}</strong></div>`).join('');
 }
 
 function getFilteredData() {
@@ -235,6 +250,12 @@ function renderHeatmap(incidents) {
 
 function openRankingDialog(title, entries) {
   byId('ranking-title').textContent = title;
+  const list = byId('ranking-list');
+  list.innerHTML = entries.map(([name, count], idx) => `<div class="card">${idx + 1}. ${name}<strong style="float:right">${count}</strong></div>`).join('');
+  list.scrollTop = 0;
+  const d = byId('ranking-dialog');
+  d.showModal();
+  d.querySelector('.form').scrollTop = 0;
   byId('ranking-list').innerHTML = entries.map(([name, count], idx) => `<div class="card">${idx + 1}. ${name}<strong style="float:right">${count}</strong></div>`).join('');
   byId('ranking-dialog').showModal();
 }
@@ -274,6 +295,15 @@ function collectHistoryValues(key) {
   return [...set].sort();
 }
 
+function collectHistorySorted(key) {
+  const map = {};
+  state.services.forEach((s) => {
+    const add = (v) => { if (!v) return; map[v] = (map[v] || 0) + 1; };
+    if (Array.isArray(s[key])) s[key].forEach(add); else add(s[key]);
+  });
+  return Object.entries(map).sort((a, b) => b[1] - a[1]).map(([k]) => k);
+}
+
 function addColleagueField(value = '', targetId = 'colleague-wrap') {
   const wrap = byId(targetId);
   const row = document.createElement('div');
@@ -305,6 +335,15 @@ function openServiceDialog(serviceId = null) {
     form.location.value = edit.location || '';
     form.vehicle.value = edit.vehicle || '';
   }
+  if (!edit) {
+    const now = new Date();
+    const local = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+    form.startAt.value = local;
+    form.endAt.value = local;
+  }
+  (edit?.colleagues?.length ? edit.colleagues : ['']).forEach((c) => addColleagueField(c));
+  mountSuggestions(form.location, 'service-location-suggest', collectHistorySorted('location'));
+  mountSuggestions(form.vehicle, 'service-vehicle-suggest', collectHistorySorted('vehicle'));
   (edit?.colleagues?.length ? edit.colleagues : ['']).forEach((c) => addColleagueField(c));
   mountSuggestions(form.location, 'service-location-suggest', collectHistoryValues('location'));
   mountSuggestions(form.vehicle, 'service-vehicle-suggest', collectHistoryValues('vehicle'));
@@ -413,6 +452,8 @@ byId('btn-new-seg').onclick = () => {
   byId('seg-colleague-wrap').innerHTML = '';
   addColleagueField('', 'seg-colleague-wrap');
   buildTimeButtons('seg-time-grid');
+  mountSuggestions(f.location, 'seg-location-suggest', collectHistorySorted('location'));
+  mountSuggestions(f.vehicle, 'seg-vehicle-suggest', collectHistorySorted('vehicle'));
   mountSuggestions(f.location, 'seg-location-suggest', collectHistoryValues('location'));
   mountSuggestions(f.vehicle, 'seg-vehicle-suggest', collectHistoryValues('vehicle'));
   mountSuggestions(f.alarmCode, 'seg-alarm-suggest', state.alarmCodes.map((a) => a.code), 10);
@@ -617,3 +658,12 @@ function setupDialogDismiss(dialog) {
 }
 
 render();
+document.querySelectorAll('.hour-btn').forEach((btn) => {
+  btn.onclick = () => {
+    const f = byId('service-form');
+    if (!f.startAt.value) return;
+    const d = new Date(f.startAt.value);
+    d.setHours(d.getHours() + Number(btn.dataset.hours));
+    f.endAt.value = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  };
+});

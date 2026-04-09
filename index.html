@@ -18,6 +18,7 @@
     <nav class="sidebar">
       <button class="tab active" data-tab="dienste">📅 Dienste</button>
       <button class="tab" data-tab="statistik">📊 Statistik</button>
+      <button class="tab" data-tab="abrechnung">🧾 Abrechnung</button>
       <button class="tab" data-tab="settings">⚙️ Einstellungen</button>
     </nav>
     <main>
@@ -78,6 +79,23 @@
           <h4>📅 Einsatzkalender</h4>
           <div id="calendar-heatmap" class="heatmap"></div>
         </div>
+        <div class="two-col">
+          <div class="card">
+            <h4>🏷️ Top Alarmcodes</h4>
+            <div id="top-alarm-list" class="card-list compact-list"></div>
+          </div>
+          <div class="card">
+            <h4>🧬 Top PZC</h4>
+            <div id="top-pzc-list" class="card-list compact-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tab-abrechnung" class="tab-panel">
+      <div class="panel">
+        <h2>Abrechnung</h2>
+        <div class="card meta">Bereich in Vorbereitung.</div>
       </div>
     </section>
 
@@ -126,6 +144,14 @@
       <h3>Dienst erfassen</h3>
       <div class="two-col">
         <label>Beginn
+          <div class="time-row">
+            <input name="startAt" type="datetime-local" required>
+            <div class="quick-hours">
+              <button type="button" class="btn hour-btn" data-hours="8">+8h</button>
+              <button type="button" class="btn hour-btn" data-hours="10">+10h</button>
+              <button type="button" class="btn hour-btn" data-hours="12">+12h</button>
+            </div>
+          </div>
           <input name="startAt" type="datetime-local" required>
         </label>
         <label>Ende
