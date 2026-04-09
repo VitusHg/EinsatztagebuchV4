@@ -98,6 +98,20 @@ function shiftInfo(service) {
 function formatDateTime(value) {
   return new Date(value).toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
 }
+
+function toLocalDateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function daysBetweenLocal(a, b) {
+  const start = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+  const end = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+  return Math.round((end - start) / 86400000);
+}
+
 function serviceHours(service) {
   if (service.isSeg) {
     const i = service.incidents?.[0];
@@ -246,8 +260,7 @@ function renderHeatmap(services) {
   const days = [];
   const start = new Date(selectedCalendarYear, 0, 1);
   const end = new Date(selectedCalendarYear + 1, 0, 1);
-  const dayMs = 86400000;
-  const totalDays = Math.round((end - start) / dayMs);
+  const totalDays = daysBetweenLocal(start, end);
   const startWeekday = (start.getDay() + 6) % 7; // Mo=0 ... So=6
   const gridStart = new Date(start);
   gridStart.setDate(start.getDate() - startWeekday);
@@ -260,13 +273,13 @@ function renderHeatmap(services) {
   const months = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
   monthRow.innerHTML = months.map((label, monthIdx) => {
     const monthDate = new Date(selectedCalendarYear, monthIdx, 1);
-    const weekIndex = Math.floor((monthDate - gridStart) / dayMs / 7);
+    const weekIndex = Math.floor(daysBetweenLocal(gridStart, monthDate) / 7);
     return `<span style="grid-column:${weekIndex + 1}">${label}</span>`;
   }).join('');
   for (let i = 0; i < totalCells; i++) {
     const d = new Date(gridStart);
     d.setDate(gridStart.getDate() + i);
-    const key = d.toISOString().slice(0, 10);
+    const key = toLocalDateKey(d);
     if (key < `${selectedCalendarYear}-01-01` || key > `${selectedCalendarYear}-12-31`) {
       days.push('<span class="heat outside-year" aria-hidden="true"></span>');
       continue;
