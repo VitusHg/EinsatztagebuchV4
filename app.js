@@ -78,10 +78,6 @@ function renderServiceList() {
     card.innerHTML = `<h4 style="font-size:1.22rem">${icon} ${start} <span class="pill">${s.isSeg ? 'SEG' : label}</span></h4>
       <div class="meta">📍 ${s.location}</div>
       <div class="meta">🚑 ${s.vehicle}</div>
-    const weekday = new Date(s.startAt).toLocaleDateString('de-DE', { weekday: 'short' }).toUpperCase();
-    card.innerHTML = `<h4>${s.isSeg ? '⚡' : '☀️'} ${start} <span class="pill">${s.isSeg ? 'SEG' : weekday}</span></h4>
-      <div class="meta">📍 ${s.location}</div>
-      <div class="meta">🚑 ${s.vehicle} · 👥 ${s.colleagues?.length || 0}</div>
       <div class="meta">📷 ${s.incidents.length} Einsätze · ⏱️ ${serviceHours(s)}</div>`;
     card.onclick = () => selectService(s.id);
     card.ondblclick = () => openServiceDialog(s.id);
@@ -168,16 +164,12 @@ function renderStats() {
   const avgByShift = shiftOnly.length ? (incidents.length / shiftOnly.length).toFixed(1) : '0.0';
   const durationHours = services.reduce((acc, s) => acc + (Number(serviceHours(s).replace('h', '')) || 0), 0).toFixed(1);
   const blueCount = incidents.filter((i) => i.lights).length;
-  const transportCount = incidents.filter((i) => i.times?.['Transport']).length;
-  const documentationRate = incidents.length ? Math.round((incidents.filter((i) => i.note).length / incidents.length) * 100) : 0;
   root.innerHTML = `<div class="card"><h4>📟 Einsätze gesamt</h4><strong>${incidents.length}</strong></div>
     <div class="card"><h4>🗂️ Dienste gesamt</h4><strong>${shiftOnly.length}</strong></div>
     <div class="card"><h4>⚡ SEG Einsätze</h4><strong>${services.filter((s) => s.isSeg).length}</strong></div>
     <div class="card"><h4>⏱️ Dienststunden</h4><strong>${durationHours}h</strong></div>
     <div class="card"><h4>📈 Ø Einsätze / Dienst</h4><strong>${avgByShift}</strong></div>
     <div class="card"><h4>🚨 Blaulichtquote</h4><strong>${incidents.length ? Math.round(100 * blueCount / incidents.length) : 0}%</strong><div class="meta">${blueCount}/${incidents.length}</div></div>
-    <div class="card"><h4>🚑 mit Transport</h4><strong>${transportCount}</strong></div>
-    <div class="card"><h4>📝 Dokumentationsquote</h4><strong>${documentationRate}%</strong></div>
     <div class="card"><h4>🏷️ Top Stichwörter</h4><div class="meta">${topAlarm}</div></div>
     <div class="card"><h4>🧬 Top PZC Diagnose</h4><div class="meta">${topPzc}</div></div>`;
   renderPie('vehicle', services.map((s) => s.vehicle || 'Unbekannt'));
@@ -256,8 +248,6 @@ function openRankingDialog(title, entries) {
   const d = byId('ranking-dialog');
   d.showModal();
   d.querySelector('.form').scrollTop = 0;
-  byId('ranking-list').innerHTML = entries.map(([name, count], idx) => `<div class="card">${idx + 1}. ${name}<strong style="float:right">${count}</strong></div>`).join('');
-  byId('ranking-dialog').showModal();
 }
 
 function renderCodeLists() {
@@ -344,9 +334,6 @@ function openServiceDialog(serviceId = null) {
   (edit?.colleagues?.length ? edit.colleagues : ['']).forEach((c) => addColleagueField(c));
   mountSuggestions(form.location, 'service-location-suggest', collectHistorySorted('location'));
   mountSuggestions(form.vehicle, 'service-vehicle-suggest', collectHistorySorted('vehicle'));
-  (edit?.colleagues?.length ? edit.colleagues : ['']).forEach((c) => addColleagueField(c));
-  mountSuggestions(form.location, 'service-location-suggest', collectHistoryValues('location'));
-  mountSuggestions(form.vehicle, 'service-vehicle-suggest', collectHistoryValues('vehicle'));
   byId('service-dialog').showModal();
 }
 
@@ -454,8 +441,6 @@ byId('btn-new-seg').onclick = () => {
   buildTimeButtons('seg-time-grid');
   mountSuggestions(f.location, 'seg-location-suggest', collectHistorySorted('location'));
   mountSuggestions(f.vehicle, 'seg-vehicle-suggest', collectHistorySorted('vehicle'));
-  mountSuggestions(f.location, 'seg-location-suggest', collectHistoryValues('location'));
-  mountSuggestions(f.vehicle, 'seg-vehicle-suggest', collectHistoryValues('vehicle'));
   mountSuggestions(f.alarmCode, 'seg-alarm-suggest', state.alarmCodes.map((a) => a.code), 10);
   byId('seg-dialog').showModal();
 };
